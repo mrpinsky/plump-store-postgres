@@ -1,5 +1,5 @@
-import { PostgresStore } from './storage/sql';
+import { PGStore } from './storage/sql';
 
 export {
-  PostgresStore,
+  PGStore,
 };

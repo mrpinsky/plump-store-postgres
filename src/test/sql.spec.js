@@ -1,7 +1,7 @@
 /* eslint-env node, mocha*/
 /* eslint no-shadow: 0 */
 
-import { PostgresStore } from '../sql';
+import { PGStore } from '../sql';
 import { testSuite } from 'plump';
 import * as pg from 'pg';
 
@@ -36,7 +36,7 @@ function runSQL(command, opts = {}) {
 testSuite({
   describe, it, before, after,
 }, {
-  ctor: PostgresStore,
+  ctor: PGStore,
   opts: {
     sql: {
       connection: {
