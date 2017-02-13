@@ -75,8 +75,8 @@ testSuite({
       `, { database: 'plump_test' });
     });
   },
-  // after: (driver) => {
-    // return driver.teardown()
-    // .then(() => runSQL('DROP DATABASE plump_test;'));
-  // },
+  after: (driver) => {
+    return driver.teardown()
+    .then(() => runSQL('DROP DATABASE plump_test;'));
+  },
 });
