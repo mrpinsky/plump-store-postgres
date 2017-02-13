@@ -24,7 +24,7 @@ function objectToWhereChain(query, block, context) {
 }
 
 
-export class PostgresStore extends Storage {
+export class PGStore extends Storage {
   constructor(opts = {}) {
     super(opts);
     const options = Object.assign(

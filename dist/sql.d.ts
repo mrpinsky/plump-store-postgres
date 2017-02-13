@@ -6,12 +6,12 @@ import { StringIndexed } from '../util.d';
 
 import * as Storage from './storage.d';
 
-export as namespace PostgresStore;
+export as namespace PGStore;
 
-declare abstract class PostgresStore extends Storage {
+declare abstract class PGStore extends Storage {
   new (opts: Knex.Config);
 
   teardown(): Bluebird<void>;
 }
 
-export { PostgresStore };
+export { PGStore };

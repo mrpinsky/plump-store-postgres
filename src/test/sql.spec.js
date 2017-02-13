@@ -1,7 +1,7 @@
 /* eslint-env node, mocha*/
 /* eslint no-shadow: 0 */
 
-import { PostgresStore } from '../sql';
+import { PGStore } from '../sql';
 import { testSuite } from 'plump';
 import * as pg from 'pg';
 
@@ -36,7 +36,7 @@ function runSQL(command, opts = {}) {
 testSuite({
   describe, it, before, after,
 }, {
-  ctor: PostgresStore,
+  ctor: PGStore,
   opts: {
     sql: {
       connection: {
@@ -71,12 +71,12 @@ testSuite({
         CREATE TABLE reactions (parent_id integer not null, child_id integer not null, reaction text not null);
         CREATE UNIQUE INDEX reactions_join on reactions (parent_id, child_id, reaction);
         CREATE TABLE valence_children (parent_id integer not null, child_id integer not null, perm integer not null);
-        --CREATE UNIQUE INDEX valence_children_join on valence_children (parent_id, child_id);
+        CREATE TABLE query_children (parent_id integer not null, child_id integer not null, perm integer not null);
       `, { database: 'plump_test' });
     });
   },
-  after: (driver) => {
-    return driver.teardown()
-    .then(() => runSQL('DROP DATABASE plump_test;'));
-  },
+  // after: (driver) => {
+    // return driver.teardown()
+    // .then(() => runSQL('DROP DATABASE plump_test;'));
+  // },
 });
