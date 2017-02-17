@@ -2,8 +2,21 @@
 /* eslint no-shadow: 0 */
 
 import { PGStore } from '../sql';
-import { testSuite } from 'plump';
+import { testSuite, TestType } from 'plump';
 import * as pg from 'pg';
+import chai from 'chai';
+import chaiSubset from 'chai-subset';
+import chaiAsPromised from 'chai-as-promised';
+chai.use(chaiSubset);
+chai.use(chaiAsPromised);
+const expect = chai.expect;
+
+TestType.$fields.queryChildren.relationship.$sides.queryChildren.self.query.rawJoin =
+'left outer join query_children as querychildren on querychildren.child_id = tests.id and querychildren.perm >= 2';
+TestType.$fields.queryParents.relationship.$sides.queryParents.self.query.rawJoin =
+'left outer join query_children as queryparents on queryparents.parent_id = tests.id and queryparents.perm >= 2';
+
+
 
 function runSQL(command, opts = {}) {
   const connOptions = Object.assign(
@@ -32,6 +45,33 @@ function runSQL(command, opts = {}) {
   });
 }
 
+function createDatabase(name) {
+  return runSQL(`DROP DATABASE if exists ${name};`)
+  .then(() => runSQL(`CREATE DATABASE ${name};`))
+  .then(() => {
+    return runSQL(`
+      CREATE SEQUENCE testid_seq
+        START WITH 1
+        INCREMENT BY 1
+        NO MINVALUE
+        MAXVALUE 2147483647
+        CACHE 1
+        CYCLE;
+      CREATE TABLE tests (
+        id integer not null primary key DEFAULT nextval('testid_seq'::regclass),
+        name text,
+        extended jsonb not null default '{}'::jsonb
+      );
+      CREATE TABLE parent_child_relationship (parent_id integer not null, child_id integer not null);
+      CREATE UNIQUE INDEX children_join on parent_child_relationship (parent_id, child_id);
+      CREATE TABLE reactions (parent_id integer not null, child_id integer not null, reaction text not null);
+      CREATE UNIQUE INDEX reactions_join on reactions (parent_id, child_id, reaction);
+      CREATE TABLE valence_children (parent_id integer not null, child_id integer not null, perm integer not null);
+      CREATE TABLE query_children (parent_id integer not null, child_id integer not null, perm integer not null);
+    `, { database: name });
+  });
+}
+
 
 testSuite({
   describe, it, before, after,
@@ -49,34 +89,74 @@ testSuite({
     terminal: true,
   },
   name: 'Plump Postgres Store',
-  before: () => {
-    return runSQL('DROP DATABASE if exists plump_test;')
-    .then(() => runSQL('CREATE DATABASE plump_test;'))
-    .then(() => {
-      return runSQL(`
-        CREATE SEQUENCE testid_seq
-          START WITH 1
-          INCREMENT BY 1
-          NO MINVALUE
-          MAXVALUE 2147483647
-          CACHE 1
-          CYCLE;
-        CREATE TABLE tests (
-          id integer not null primary key DEFAULT nextval('testid_seq'::regclass),
-          name text,
-          extended jsonb not null default '{}'::jsonb
-        );
-        CREATE TABLE parent_child_relationship (parent_id integer not null, child_id integer not null);
-        CREATE UNIQUE INDEX children_join on parent_child_relationship (parent_id, child_id);
-        CREATE TABLE reactions (parent_id integer not null, child_id integer not null, reaction text not null);
-        CREATE UNIQUE INDEX reactions_join on reactions (parent_id, child_id, reaction);
-        CREATE TABLE valence_children (parent_id integer not null, child_id integer not null, perm integer not null);
-        CREATE TABLE query_children (parent_id integer not null, child_id integer not null, perm integer not null);
-      `, { database: 'plump_test' });
-    });
-  },
+  before: () => createDatabase('plump_test'),
   after: (driver) => {
-    // return driver.teardown()
-    // .then(() => runSQL('DROP DATABASE plump_test;'));
+    return driver.teardown()
+    .then(() => runSQL('DROP DATABASE plump_test;'));
   },
+});
+
+const sampleObject = {
+  name: 'potato',
+  extended: {
+    actual: 'rutabaga',
+    otherValue: 42,
+  },
+};
+
+describe('postgres-specific behaviors', () => {
+  let store;
+  before(() => {
+    return createDatabase('secondary_plump_test')
+    .then(() => {
+      store = new PGStore({
+        sql: {
+          connection: {
+            database: 'secondary_plump_test',
+            user: 'postgres',
+            host: 'localhost',
+            port: 5432,
+          },
+        },
+        terminal: true,
+      });
+    });
+  });
+
+  it('Returns extra contents', () => {
+    return store.write(TestType, sampleObject)
+    .then((createdObject) => {
+      return store.add(TestType, createdObject.id, 'likers', 100)
+      .then(() => store.add(TestType, createdObject.id, 'likers', 101))
+      .then(() => store.add(TestType, createdObject.id, 'agreers', 100))
+      .then(() => store.add(TestType, createdObject.id, 'agreers', 101))
+      .then(() => store.add(TestType, createdObject.id, 'valenceChildren', 100, { perm: 1 }))
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 }))
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
+      .then(() => store.read(TestType, createdObject.id))
+      .then((v) => console.log(JSON.stringify(v, null, 2)))
+      .then(() => {
+        return expect(store.read(TestType, createdObject.id))
+        .to.eventually.deep.equal(Object.assign({}, sampleObject, {
+          [TestType.$id]: createdObject.id,
+          likers: [{ id: 100 }, { id: 101 }],
+          agreers: [{ id: 100 }, { id: 101 }],
+          queryChildren: [{ id: 102, perm: 2 }, { id: 103, perm: 3 }],
+          queryParents: [],
+          likees: [],
+          agreees: [],
+          valenceChildren: [{ id: 100, perm: 1 }],
+          valenceParents: [],
+          children: [],
+          parents: [],
+        }));
+      });
+    });
+  });
+
+  after(() => {
+    // return store.teardown()
+    // .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
+  });
 });

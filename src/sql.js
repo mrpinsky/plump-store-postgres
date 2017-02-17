@@ -4,16 +4,6 @@ import { Storage } from 'plump';
 import { blockRead } from './blockRead';
 const $knex = Symbol('$knex');
 
-function deserializeWhere(query, block) {
-  const car = block[0];
-  const cdr = block.slice(1);
-  if (Array.isArray(cdr[0])) {
-    return cdr.reduce((subQuery, subBlock) => deserializeWhere(subQuery, subBlock), query);
-  } else {
-    return query[car].apply(query, cdr);
-  }
-}
-
 function fixCase(data, schema) {
   Object.keys(schema).forEach((key) => {
     if ((key.toLowerCase() !== key) && (data[key.toLowerCase()])) {
@@ -22,6 +12,16 @@ function fixCase(data, schema) {
     }
   });
   return data;
+}
+
+function deserializeWhere(query, block) {
+  const car = block[0];
+  const cdr = block.slice(1);
+  if (Array.isArray(cdr[0])) {
+    return cdr.reduce((subQuery, subBlock) => deserializeWhere(subQuery, subBlock), query);
+  } else {
+    return query[car].apply(query, cdr);
+  }
 }
 
 function objectToWhereChain(query, block, context) {
@@ -73,7 +73,6 @@ export class PGStore extends Storage {
   write(t, v) {
     return Bluebird.resolve()
     .then(() => {
-      debugger;
       const id = v[t.$id];
       const updateObject = {};
       Object.keys(t.$fields).forEach((fieldName) => {
