@@ -76,7 +76,7 @@ testSuite({
     });
   },
   after: (driver) => {
-    return driver.teardown()
-    .then(() => runSQL('DROP DATABASE plump_test;'));
+    // return driver.teardown()
+    // .then(() => runSQL('DROP DATABASE plump_test;'));
   },
 });
