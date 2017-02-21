@@ -1,7 +1,18 @@
 import Bluebird from 'bluebird';
 import knex from 'knex';
 import { Storage } from 'plump';
+import { blockRead } from './blockRead';
 const $knex = Symbol('$knex');
+
+function fixCase(data, schema) {
+  Object.keys(schema).forEach((key) => {
+    if ((key.toLowerCase() !== key) && (data[key.toLowerCase()])) {
+      data[key] = data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
+      delete data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
+    }
+  });
+  return data;
+}
 
 function deserializeWhere(query, block) {
   const car = block[0];
@@ -67,14 +78,11 @@ export class PGStore extends Storage {
       Object.keys(t.$fields).forEach((fieldName) => {
         if (v[fieldName] !== undefined) {
           // copy from v to the best of our ability
-          if (
-            (t.$fields[fieldName].type === 'array') ||
-            (t.$fields[fieldName].type === 'hasMany')
-          ) {
+          if (t.$fields[fieldName].type === 'array') {
             updateObject[fieldName] = v[fieldName].concat();
           } else if (t.$fields[fieldName].type === 'object') {
             updateObject[fieldName] = Object.assign({}, v[fieldName]);
-          } else {
+          } else if (t.$fields[fieldName].type !== 'hasMany') {
             updateObject[fieldName] = v[fieldName];
           }
         }
@@ -98,8 +106,15 @@ export class PGStore extends Storage {
   }
 
   readOne(t, id) {
-    return this[$knex](t.$name).where({ [t.$id]: id }).select()
-    .then((o) => o[0] || null);
+    return blockRead(t, this[$knex], { [t.$id]: id })
+    // return this[$knex](t.$name).where({ [t.$id]: id }).select()
+    .then((o) => {
+      if (o[0]) {
+        return fixCase(o[0], t.$fields);
+      } else {
+        return null;
+      }
+    });
   }
 
   readMany(type, id, relationshipTitle) {
