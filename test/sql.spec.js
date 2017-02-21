@@ -1,8 +1,9 @@
 /* eslint-env node, mocha*/
 /* eslint no-shadow: 0 */
 
-import { PGStore } from '../sql';
-import { testSuite, TestType } from 'plump';
+import { PGStore } from '../src/index';
+import { TestType } from 'plump/test/testType';
+import { testSuite } from 'plump/test/storageTests';
 import * as pg from 'pg';
 import chai from 'chai';
 import chaiSubset from 'chai-subset';
