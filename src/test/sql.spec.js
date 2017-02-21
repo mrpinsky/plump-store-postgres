@@ -11,11 +11,11 @@ chai.use(chaiSubset);
 chai.use(chaiAsPromised);
 const expect = chai.expect;
 
-TestType.$fields.queryChildren.relationship.$sides.queryChildren.self.query.rawJoin =
-'left outer join query_children as querychildren on querychildren.child_id = tests.id and querychildren.perm >= 2';
-TestType.$fields.queryParents.relationship.$sides.queryParents.self.query.rawJoin =
-'left outer join query_children as queryparents on queryparents.parent_id = tests.id and queryparents.perm >= 2';
-
+// TestType.$fields.queryChildren.relationship.$sides.queryChildren.self.query.rawJoin =
+// 'left outer join query_children as querychildren on querychildren.parent_id = tests.id and querychildren.perm >= 2';
+// TestType.$fields.queryParents.relationship.$sides.queryParents.self.query.rawJoin =
+// 'left outer join query_children as queryparents on queryparents.child_id = tests.id and queryparents.perm >= 2';
+//
 
 
 function runSQL(command, opts = {}) {
@@ -134,8 +134,6 @@ describe('postgres-specific behaviors', () => {
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 }))
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
-      .then(() => store.read(TestType, createdObject.id))
-      .then((v) => console.log(JSON.stringify(v, null, 2)))
       .then(() => {
         return expect(store.read(TestType, createdObject.id))
         .to.eventually.deep.equal(Object.assign({}, sampleObject, {
@@ -156,7 +154,7 @@ describe('postgres-specific behaviors', () => {
   });
 
   after(() => {
-    // return store.teardown()
-    // .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
+    return store.teardown()
+    .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
   });
 });
