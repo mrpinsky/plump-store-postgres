@@ -30,7 +30,7 @@ function blockRead(Type, knex, query) {
   var groups = [];
   var basicJoins = [];
   var fancyJoins = [];
-  var schema = Type.$fields;
+  var schema = Type.$schema;
   Object.keys(schema).forEach(function (key) {
     if (schema[key].type === 'hasMany') {
       var joinName = key.toLowerCase();

@@ -111,14 +111,14 @@ var PGStore = exports.PGStore = function (_Storage) {
       return _bluebird2.default.resolve().then(function () {
         var id = v[t.$id];
         var updateObject = {};
-        Object.keys(t.$fields).forEach(function (fieldName) {
+        Object.keys(t.$schema).forEach(function (fieldName) {
           if (v[fieldName] !== undefined) {
             // copy from v to the best of our ability
-            if (t.$fields[fieldName].type === 'array') {
+            if (t.$schema[fieldName].type === 'array') {
               updateObject[fieldName] = v[fieldName].concat();
-            } else if (t.$fields[fieldName].type === 'object') {
+            } else if (t.$schema[fieldName].type === 'object') {
               updateObject[fieldName] = Object.assign({}, v[fieldName]);
-            } else if (t.$fields[fieldName].type !== 'hasMany') {
+            } else if (t.$schema[fieldName].type !== 'hasMany') {
               updateObject[fieldName] = v[fieldName];
             }
           }
@@ -147,7 +147,7 @@ var PGStore = exports.PGStore = function (_Storage) {
       // return this[$knex](t.$name).where({ [t.$id]: id }).select()
       .then(function (o) {
         if (o[0]) {
-          return fixCase(o[0], t.$fields);
+          return fixCase(o[0], t.$schema);
         } else {
           return null;
         }
@@ -158,7 +158,7 @@ var PGStore = exports.PGStore = function (_Storage) {
     value: function readMany(type, id, relationshipTitle) {
       var _this3 = this;
 
-      var relationshipBlock = type.$fields[relationshipTitle];
+      var relationshipBlock = type.$schema[relationshipTitle];
       var sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
       var toSelect = [sideInfo.other.field, sideInfo.self.field];
       if (relationshipBlock.relationship.$extras) {
@@ -202,7 +202,7 @@ var PGStore = exports.PGStore = function (_Storage) {
 
       var extras = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : {};
 
-      var relationshipBlock = type.$fields[relationshipTitle];
+      var relationshipBlock = type.$schema[relationshipTitle];
       var sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
       var newField = (_newField = {}, _defineProperty(_newField, sideInfo.other.field, childId), _defineProperty(_newField, sideInfo.self.field, id), _newField);
       if (relationshipBlock.relationship.$restrict) {
@@ -227,7 +227,7 @@ var PGStore = exports.PGStore = function (_Storage) {
 
       var extras = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : {};
 
-      var relationshipBlock = type.$fields[relationshipTitle];
+      var relationshipBlock = type.$schema[relationshipTitle];
       var sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
       var newField = {};
       Object.keys(relationshipBlock.relationship.$extras).forEach(function (extra) {
@@ -251,7 +251,7 @@ var PGStore = exports.PGStore = function (_Storage) {
       var _whereBlock2,
           _this6 = this;
 
-      var relationshipBlock = type.$fields[relationshipTitle];
+      var relationshipBlock = type.$schema[relationshipTitle];
       var sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
       var whereBlock = (_whereBlock2 = {}, _defineProperty(_whereBlock2, sideInfo.other.field, childId), _defineProperty(_whereBlock2, sideInfo.self.field, id), _whereBlock2);
       if (relationshipBlock.relationship.$restrict) {

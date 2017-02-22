@@ -31,9 +31,9 @@ _chai2.default.use(_chaiSubset2.default);
 _chai2.default.use(_chaiAsPromised2.default);
 var expect = _chai2.default.expect;
 
-// TestType.$fields.queryChildren.relationship.$sides.queryChildren.self.query.rawJoin =
+// TestType.$schema.queryChildren.relationship.$sides.queryChildren.self.query.rawJoin =
 // 'left outer join query_children as querychildren on querychildren.parent_id = tests.id and querychildren.perm >= 2';
-// TestType.$fields.queryParents.relationship.$sides.queryParents.self.query.rawJoin =
+// TestType.$schema.queryParents.relationship.$sides.queryParents.self.query.rawJoin =
 // 'left outer join query_children as queryparents on queryparents.child_id = tests.id and queryparents.perm >= 2';
 //
 
