@@ -94,7 +94,6 @@ export function blockRead(Type, knex, query) {
   }, joinedQuery);
   const selectedQuery = evenMoreJoinedQuery.where(query).select(selects);
   const groupByQuery = selectedQuery.groupBy(groups);
-  debugger;
   // console.log(groupByQuery.toString());
   return groupByQuery;
 }

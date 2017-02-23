@@ -73,27 +73,27 @@ export class PGStore extends Storage {
   write(t, v) {
     return Bluebird.resolve()
     .then(() => {
-      const id = v[t.$id];
+      const id = v[t.$schema.$id];
       const updateObject = {};
-      Object.keys(t.$schema).forEach((fieldName) => {
-        if (v[fieldName] !== undefined) {
+      for (const attrName in t.$schema.attributes) {
+        if (v[attrName] !== undefined) {
           // copy from v to the best of our ability
-          if (t.$schema[fieldName].type === 'array') {
-            updateObject[fieldName] = v[fieldName].concat();
-          } else if (t.$schema[fieldName].type === 'object') {
-            updateObject[fieldName] = Object.assign({}, v[fieldName]);
-          } else if (t.$schema[fieldName].type !== 'hasMany') {
-            updateObject[fieldName] = v[fieldName];
+          if (t.$schema.attributes[attrName].type === 'array') {
+            updateObject[attrName] = v[attrName].concat();
+          } else if (t.$schema.attributes[attrName].type === 'object') {
+            updateObject[attrName] = Object.assign({}, v[attrName]);
+          } else {
+            updateObject[attrName] = v[attrName];
           }
         }
-      });
+      }
       if ((id === undefined) && (this.terminal)) {
-        return this[$knex](t.$name).insert(updateObject).returning(t.$id)
+        return this[$knex](t.$name).insert(updateObject).returning(t.$schema.$id)
         .then((createdId) => {
           return this.read(t, createdId[0]);
         });
       } else if (id !== undefined) {
-        return this[$knex](t.$name).where({ [t.$id]: id }).update(updateObject)
+        return this[$knex](t.$name).where({ [t.$schema.$id]: id }).update(updateObject)
         .then(() => {
           return this.read(t, id);
         });
@@ -101,13 +101,13 @@ export class PGStore extends Storage {
         throw new Error('Cannot create new content in a non-terminal store');
       }
     }).then((result) => {
-      return this.notifyUpdate(t, result[t.$id], result).then(() => result);
+      return this.notifyUpdate(t, result[t.$schema.$id], result).then(() => result);
     });
   }
 
   readOne(t, id) {
-    return blockRead(t, this[$knex], { [t.$id]: id })
-    // return this[$knex](t.$name).where({ [t.$id]: id }).select()
+    return blockRead(t, this[$knex], { [t.$schema.$id]: id })
+    // return this[$knex](t.$name).where({ [t.$schema.$id]: id }).select()
     .then((o) => {
       if (o[0]) {
         return fixCase(o[0], t.$schema);
@@ -118,7 +118,7 @@ export class PGStore extends Storage {
   }
 
   readMany(type, id, relationshipTitle) {
-    const relationshipBlock = type.$schema[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
     const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     let toSelect = [sideInfo.other.field, sideInfo.self.field];
     if (relationshipBlock.type.$extras) {
@@ -155,12 +155,12 @@ export class PGStore extends Storage {
   }
 
   delete(t, id) {
-    return this[$knex](t.$name).where({ [t.$id]: id }).delete()
+    return this[$knex](t.$name).where({ [t.$schema.$id]: id }).delete()
     .then((o) => o);
   }
 
   add(type, id, relationshipTitle, childId, extras = {}) {
-    const relationshipBlock = type.$schema[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
     const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     const newField = {
       [sideInfo.other.field]: childId,
@@ -182,7 +182,7 @@ export class PGStore extends Storage {
   }
 
   modifyRelationship(type, id, relationshipTitle, childId, extras = {}) {
-    const relationshipBlock = type.$schema[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
     const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     const newField = {};
     Object.keys(relationshipBlock.type.$extras).forEach((extra) => {
@@ -205,7 +205,7 @@ export class PGStore extends Storage {
   }
 
   remove(type, id, relationshipTitle, childId) {
-    const relationshipBlock = type.$schema[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
     const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     const whereBlock = {
       [sideInfo.other.field]: childId,

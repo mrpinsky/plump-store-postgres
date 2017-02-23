@@ -165,7 +165,7 @@ describe('postgres-specific behaviors', () => {
   });
 
   after(() => {
-    return store.teardown()
+    return store.teardown();
     // .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
   });
 });
