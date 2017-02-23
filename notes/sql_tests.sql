@@ -118,4 +118,4 @@ select "id", "name", "extended", COALESCE(
           left outer join "reactions" as "agreers" on "agreers"."child_id" = "tests"."id" and "agreers"."reaction" = 'agree'
           left outer join "reactions" as "agreees" on "agreees"."parent_id" = "tests"."id" and "agreees"."reaction" = 'agree'
           left outer join "query_children" as "querychildren" on "querychildren"."child_id" = "tests"."id" and "querychildren"."perm" >= '2'
-          left outer join "query_children" as "queryparents" on "queryparents"."parent_id" = "tests"."id" and "queryparents"."perm" >= '2' where "id" = 1 group by "id", "name", "extended"
+          left outer join "query_children" as "queryparents" on "queryparents"."parent_id" = "tests"."id" and "queryparents"."perm" >= '2' where "reply_parents" @> '{1}' group by "id", "name", "extended"

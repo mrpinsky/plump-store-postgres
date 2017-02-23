@@ -35,7 +35,7 @@ module.exports = {
     // require the use of === and !==
     'eqeqeq': 2,
     // make sure for-in loops have an if statement
-    'guard-for-in': 2,
+    'guard-for-in': 0,
     // Blacklist certain identifiers to prevent them being used
     // http://eslint.org/docs/rules/id-blacklist
     'id-blacklist': 0,

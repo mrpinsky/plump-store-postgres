@@ -1,5 +1,1 @@
-import { PGStore } from './storage/sql';
-
-export {
-  PGStore,
-};
+export { PGStore } from './sql';

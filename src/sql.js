@@ -5,7 +5,7 @@ import { blockRead } from './blockRead';
 const $knex = Symbol('$knex');
 
 function fixCase(data, schema) {
-  Object.keys(schema).forEach((key) => {
+  Object.keys(schema.attributes).concat(Object.keys(schema.relationships)).forEach((key) => {
     if ((key.toLowerCase() !== key) && (data[key.toLowerCase()])) {
       data[key] = data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
       delete data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
@@ -73,27 +73,27 @@ export class PGStore extends Storage {
   write(t, v) {
     return Bluebird.resolve()
     .then(() => {
-      const id = v[t.$id];
+      const id = v[t.$schema.$id];
       const updateObject = {};
-      Object.keys(t.$fields).forEach((fieldName) => {
-        if (v[fieldName] !== undefined) {
+      for (const attrName in t.$schema.attributes) {
+        if (v[attrName] !== undefined) {
           // copy from v to the best of our ability
-          if (t.$fields[fieldName].type === 'array') {
-            updateObject[fieldName] = v[fieldName].concat();
-          } else if (t.$fields[fieldName].type === 'object') {
-            updateObject[fieldName] = Object.assign({}, v[fieldName]);
-          } else if (t.$fields[fieldName].type !== 'hasMany') {
-            updateObject[fieldName] = v[fieldName];
+          if (t.$schema.attributes[attrName].type === 'array') {
+            updateObject[attrName.toLowerCase()] = v[attrName].concat();
+          } else if (t.$schema.attributes[attrName].type === 'object') {
+            updateObject[attrName.toLowerCase()] = Object.assign({}, v[attrName]);
+          } else {
+            updateObject[attrName.toLowerCase()] = v[attrName];
           }
         }
-      });
+      }
       if ((id === undefined) && (this.terminal)) {
-        return this[$knex](t.$name).insert(updateObject).returning(t.$id)
+        return this[$knex](t.$name).insert(updateObject).returning(t.$schema.$id)
         .then((createdId) => {
           return this.read(t, createdId[0]);
         });
       } else if (id !== undefined) {
-        return this[$knex](t.$name).where({ [t.$id]: id }).update(updateObject)
+        return this[$knex](t.$name).where({ [t.$schema.$id]: id }).update(updateObject)
         .then(() => {
           return this.read(t, id);
         });
@@ -101,16 +101,16 @@ export class PGStore extends Storage {
         throw new Error('Cannot create new content in a non-terminal store');
       }
     }).then((result) => {
-      return this.notifyUpdate(t, result[t.$id], result).then(() => result);
+      return this.notifyUpdate(t, result[t.$schema.$id], result).then(() => result);
     });
   }
 
   readOne(t, id) {
-    return blockRead(t, this[$knex], { [t.$id]: id })
-    // return this[$knex](t.$name).where({ [t.$id]: id }).select()
+    return blockRead(t, this[$knex], { [t.$schema.$id]: id })
     .then((o) => {
       if (o[0]) {
-        return fixCase(o[0], t.$fields);
+        debugger;
+        return fixCase(o[0], t.$schema);
       } else {
         return null;
       }
@@ -118,11 +118,11 @@ export class PGStore extends Storage {
   }
 
   readMany(type, id, relationshipTitle) {
-    const relationshipBlock = type.$fields[relationshipTitle];
-    const sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
+    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     let toSelect = [sideInfo.other.field, sideInfo.self.field];
-    if (relationshipBlock.relationship.$extras) {
-      toSelect = toSelect.concat(Object.keys(relationshipBlock.relationship.$extras));
+    if (relationshipBlock.type.$extras) {
+      toSelect = toSelect.concat(Object.keys(relationshipBlock.type.$extras));
     }
     const whereBlock = {};
     if (sideInfo.self.query) {
@@ -130,9 +130,9 @@ export class PGStore extends Storage {
     } else {
       whereBlock[sideInfo.self.field] = id;
     }
-    if (relationshipBlock.relationship.$restrict) {
-      Object.keys(relationshipBlock.relationship.$restrict).forEach((restriction) => {
-        whereBlock[restriction] = relationshipBlock.relationship.$restrict[restriction].value;
+    if (relationshipBlock.type.$restrict) {
+      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
+        whereBlock[restriction] = relationshipBlock.type.$restrict[restriction].value;
       });
     }
     return Bluebird.resolve()
@@ -144,7 +144,7 @@ export class PGStore extends Storage {
       }
     })
     .then((context) => {
-      return objectToWhereChain(this[$knex](relationshipBlock.relationship.$name), whereBlock, context)
+      return objectToWhereChain(this[$knex](relationshipBlock.type.$name), whereBlock, context)
       .select(toSelect);
     })
     .then((l) => {
@@ -155,37 +155,37 @@ export class PGStore extends Storage {
   }
 
   delete(t, id) {
-    return this[$knex](t.$name).where({ [t.$id]: id }).delete()
+    return this[$knex](t.$name).where({ [t.$schema.$id]: id }).delete()
     .then((o) => o);
   }
 
   add(type, id, relationshipTitle, childId, extras = {}) {
-    const relationshipBlock = type.$fields[relationshipTitle];
-    const sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
+    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     const newField = {
       [sideInfo.other.field]: childId,
       [sideInfo.self.field]: id,
     };
-    if (relationshipBlock.relationship.$restrict) {
-      Object.keys(relationshipBlock.relationship.$restrict).forEach((restriction) => {
-        newField[restriction] = relationshipBlock.relationship.$restrict[restriction].value;
+    if (relationshipBlock.type.$restrict) {
+      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
+        newField[restriction] = relationshipBlock.type.$restrict[restriction].value;
       });
     }
-    if (relationshipBlock.relationship.$extras) {
-      Object.keys(relationshipBlock.relationship.$extras).forEach((extra) => {
+    if (relationshipBlock.type.$extras) {
+      Object.keys(relationshipBlock.type.$extras).forEach((extra) => {
         newField[extra] = extras[extra];
       });
     }
-    return this[$knex](relationshipBlock.relationship.$name)
+    return this[$knex](relationshipBlock.type.$name)
     .insert(newField)
     .then(() => this.notifyUpdate(type, id, null, relationshipTitle));
   }
 
   modifyRelationship(type, id, relationshipTitle, childId, extras = {}) {
-    const relationshipBlock = type.$fields[relationshipTitle];
-    const sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
+    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     const newField = {};
-    Object.keys(relationshipBlock.relationship.$extras).forEach((extra) => {
+    Object.keys(relationshipBlock.type.$extras).forEach((extra) => {
       if (extras[extra] !== undefined) {
         newField[extra] = extras[extra];
       }
@@ -194,29 +194,29 @@ export class PGStore extends Storage {
       [sideInfo.other.field]: childId,
       [sideInfo.self.field]: id,
     };
-    if (relationshipBlock.relationship.$restrict) {
-      Object.keys(relationshipBlock.relationship.$restrict).forEach((restriction) => {
-        whereBlock[restriction] = relationshipBlock.relationship.$restrict[restriction].value;
+    if (relationshipBlock.type.$restrict) {
+      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
+        whereBlock[restriction] = relationshipBlock.type.$restrict[restriction].value;
       });
     }
-    return objectToWhereChain(this[$knex](relationshipBlock.relationship.$name), whereBlock, { id, childId })
+    return objectToWhereChain(this[$knex](relationshipBlock.type.$name), whereBlock, { id, childId })
     .update(newField)
     .then(() => this.notifyUpdate(type, id, null, relationshipTitle));
   }
 
   remove(type, id, relationshipTitle, childId) {
-    const relationshipBlock = type.$fields[relationshipTitle];
-    const sideInfo = relationshipBlock.relationship.$sides[relationshipTitle];
+    const relationshipBlock = type.$schema.relationships[relationshipTitle];
+    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
     const whereBlock = {
       [sideInfo.other.field]: childId,
       [sideInfo.self.field]: id,
     };
-    if (relationshipBlock.relationship.$restrict) {
-      Object.keys(relationshipBlock.relationship.$restrict).forEach((restriction) => {
-        whereBlock[restriction] = relationshipBlock.relationship.$restrict[restriction].value;
+    if (relationshipBlock.type.$restrict) {
+      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
+        whereBlock[restriction] = relationshipBlock.type.$restrict[restriction].value;
       });
     }
-    return objectToWhereChain(this[$knex](relationshipBlock.relationship.$name), whereBlock).delete()
+    return objectToWhereChain(this[$knex](relationshipBlock.type.$name), whereBlock).delete()
     .then(() => this.notifyUpdate(type, id, null, relationshipTitle));
   }
 

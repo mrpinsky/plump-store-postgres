@@ -1,8 +1,9 @@
 /* eslint-env node, mocha*/
 /* eslint no-shadow: 0 */
 
-import { PGStore } from '../sql';
-import { testSuite, TestType } from 'plump';
+import { PGStore } from '../src/index';
+import { TestType } from 'plump/test/testType';
+import { testSuite } from 'plump/test/storageTests';
 import * as pg from 'pg';
 import chai from 'chai';
 import chaiSubset from 'chai-subset';
@@ -11,9 +12,9 @@ chai.use(chaiSubset);
 chai.use(chaiAsPromised);
 const expect = chai.expect;
 
-// TestType.$fields.queryChildren.relationship.$sides.queryChildren.self.query.rawJoin =
+// TestType.$schema.queryChildren.relationship.$sides.queryChildren.self.query.rawJoin =
 // 'left outer join query_children as querychildren on querychildren.parent_id = tests.id and querychildren.perm >= 2';
-// TestType.$fields.queryParents.relationship.$sides.queryParents.self.query.rawJoin =
+// TestType.$schema.queryParents.relationship.$sides.queryParents.self.query.rawJoin =
 // 'left outer join query_children as queryparents on queryparents.child_id = tests.id and queryparents.perm >= 2';
 //
 
@@ -60,6 +61,7 @@ function createDatabase(name) {
       CREATE TABLE tests (
         id integer not null primary key DEFAULT nextval('testid_seq'::regclass),
         name text,
+        othername text,
         extended jsonb not null default '{}'::jsonb
       );
       CREATE TABLE parent_child_relationship (parent_id integer not null, child_id integer not null);
@@ -98,6 +100,7 @@ testSuite({
 
 const sampleObject = {
   name: 'potato',
+  otherName: 'elephantine',
   extended: {
     actual: 'rutabaga',
     otherValue: 42,
@@ -138,13 +141,22 @@ describe('postgres-specific behaviors', () => {
         return expect(store.read(TestType, createdObject.id))
         .to.eventually.deep.equal(Object.assign({}, sampleObject, {
           [TestType.$id]: createdObject.id,
-          likers: [{ id: 100 }, { id: 101 }],
-          agreers: [{ id: 100 }, { id: 101 }],
-          queryChildren: [{ id: 102, perm: 2 }, { id: 103, perm: 3 }],
+          likers: [
+            { child_id: createdObject.id, parent_id: 100 },
+            { child_id: createdObject.id, parent_id: 101 }],
+          agreers: [
+            { child_id: createdObject.id, parent_id: 100 },
+            { child_id: createdObject.id, parent_id: 101 }],
+          queryChildren: [
+            { parent_id: createdObject.id, child_id: 102, perm: 2 },
+            { parent_id: createdObject.id, child_id: 103, perm: 3 },
+          ],
           queryParents: [],
           likees: [],
           agreees: [],
-          valenceChildren: [{ id: 100, perm: 1 }],
+          valenceChildren: [
+            { parent_id: createdObject.id, child_id: 100, perm: 1 },
+          ],
           valenceParents: [],
           children: [],
           parents: [],
@@ -154,7 +166,7 @@ describe('postgres-specific behaviors', () => {
   });
 
   after(() => {
-    return store.teardown()
-    .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
+    return store.teardown();
+    // .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
   });
 });
