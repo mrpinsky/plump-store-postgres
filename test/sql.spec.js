@@ -100,6 +100,7 @@ testSuite({
 
 const sampleObject = {
   name: 'potato',
+  otherName: 'elephantine',
   extended: {
     actual: 'rutabaga',
     otherValue: 42,
@@ -141,11 +142,11 @@ describe('postgres-specific behaviors', () => {
         .to.eventually.deep.equal(Object.assign({}, sampleObject, {
           [TestType.$id]: createdObject.id,
           likers: [
-            { child_id: 100, parent_id: createdObject.id },
-            { parent_id: createdObject.id, child_id: 101 }],
+            { child_id: createdObject.id, parent_id: 100 },
+            { child_id: createdObject.id, parent_id: 101 }],
           agreers: [
-            { parent_id: createdObject.id, child_id: 100 },
-            { parent_id: createdObject.id, child_id: 101 }],
+            { child_id: createdObject.id, parent_id: 100 },
+            { child_id: createdObject.id, parent_id: 101 }],
           queryChildren: [
             { parent_id: createdObject.id, child_id: 102, perm: 2 },
             { parent_id: createdObject.id, child_id: 103, perm: 3 },

@@ -70,7 +70,8 @@ export function blockRead(Type, knex, query) {
         array_agg(
           distinct(
             jsonb_build_object(
-              'id', ${joinName}.${rel.$sides[relName].other.field}
+              '${rel.$sides[relName].other.field}', ${joinName}.${rel.$sides[relName].other.field},
+              '${rel.$sides[relName].self.field}', ${joinName}.${rel.$sides[relName].self.field}
               ${extraAgg.length ? ',' + extraAgg.join(',') : ''}
             )
           )

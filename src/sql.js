@@ -5,7 +5,7 @@ import { blockRead } from './blockRead';
 const $knex = Symbol('$knex');
 
 function fixCase(data, schema) {
-  Object.keys(schema).forEach((key) => {
+  Object.keys(schema.attributes).concat(Object.keys(schema.relationships)).forEach((key) => {
     if ((key.toLowerCase() !== key) && (data[key.toLowerCase()])) {
       data[key] = data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
       delete data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
@@ -79,11 +79,11 @@ export class PGStore extends Storage {
         if (v[attrName] !== undefined) {
           // copy from v to the best of our ability
           if (t.$schema.attributes[attrName].type === 'array') {
-            updateObject[attrName] = v[attrName].concat();
+            updateObject[attrName.toLowerCase()] = v[attrName].concat();
           } else if (t.$schema.attributes[attrName].type === 'object') {
-            updateObject[attrName] = Object.assign({}, v[attrName]);
+            updateObject[attrName.toLowerCase()] = Object.assign({}, v[attrName]);
           } else {
-            updateObject[attrName] = v[attrName];
+            updateObject[attrName.toLowerCase()] = v[attrName];
           }
         }
       }
@@ -107,9 +107,9 @@ export class PGStore extends Storage {
 
   readOne(t, id) {
     return blockRead(t, this[$knex], { [t.$schema.$id]: id })
-    // return this[$knex](t.$name).where({ [t.$schema.$id]: id }).select()
     .then((o) => {
       if (o[0]) {
+        debugger;
         return fixCase(o[0], t.$schema);
       } else {
         return null;

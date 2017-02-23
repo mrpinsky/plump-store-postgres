@@ -3,9 +3,13 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.PGStore = undefined;
 
-var _sql = require('./storage/sql');
+var _sql = require('./sql');
 
-exports.PGStore = _sql.PGStore;
-//# sourceMappingURL=data:application/json;charset=utf8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbImluZGV4LmpzIl0sIm5hbWVzIjpbIlBHU3RvcmUiXSwibWFwcGluZ3MiOiI7Ozs7Ozs7QUFBQTs7UUFHRUEsTyIsImZpbGUiOiJpbmRleC5qcyIsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IFBHU3RvcmUgfSBmcm9tICcuL3N0b3JhZ2Uvc3FsJztcblxuZXhwb3J0IHtcbiAgUEdTdG9yZSxcbn07XG4iXX0=
+Object.defineProperty(exports, 'PGStore', {
+  enumerable: true,
+  get: function get() {
+    return _sql.PGStore;
+  }
+});
+//# sourceMappingURL=data:application/json;charset=utf8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbImluZGV4LmpzIl0sIm5hbWVzIjpbIlBHU3RvcmUiXSwibWFwcGluZ3MiOiI7Ozs7Ozs7Ozs7O2dCQUFTQSxPIiwiZmlsZSI6ImluZGV4LmpzIiwic291cmNlc0NvbnRlbnQiOlsiZXhwb3J0IHsgUEdTdG9yZSB9IGZyb20gJy4vc3FsJztcbiJdfQ==
