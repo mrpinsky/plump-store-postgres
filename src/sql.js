@@ -1,7 +1,7 @@
 import Bluebird from 'bluebird';
 import knex from 'knex';
 import { Storage } from 'plump';
-import { blockRead } from './blockRead';
+import { readQuery } from './queryString';
 const $knex = Symbol('$knex');
 
 function fixCase(data, schema) {
@@ -73,17 +73,17 @@ export class PGStore extends Storage {
   write(t, v) {
     return Bluebird.resolve()
     .then(() => {
-      const id = v[t.$schema.$id];
+      const id = v.id;
       const updateObject = {};
       for (const attrName in t.$schema.attributes) {
-        if (v[attrName] !== undefined) {
+        if (v.attributes[attrName] !== undefined) {
           // copy from v to the best of our ability
           if (t.$schema.attributes[attrName].type === 'array') {
-            updateObject[attrName.toLowerCase()] = v[attrName].concat();
+            updateObject[attrName.toLowerCase()] = v.attributes[attrName].concat();
           } else if (t.$schema.attributes[attrName].type === 'object') {
-            updateObject[attrName.toLowerCase()] = Object.assign({}, v[attrName]);
+            updateObject[attrName.toLowerCase()] = Object.assign({}, v.attributes[attrName]);
           } else {
-            updateObject[attrName.toLowerCase()] = v[attrName];
+            updateObject[attrName.toLowerCase()] = v.attributes[attrName];
           }
         }
       }
@@ -105,12 +105,16 @@ export class PGStore extends Storage {
     });
   }
 
-  readOne(t, id) {
-    return blockRead(t, this[$knex], { [t.$schema.$id]: id })
+  readAttributes(t, id) {
+    let query = t.cacheGet(this, 'readAttributes');
+    if (query === undefined) {
+      query = readQuery(t);
+      t.cacheSet(this, 'readAttributes', query);
+    }
+    return this[$knex].raw(query, id)
     .then((o) => {
-      if (o[0]) {
-        debugger;
-        return fixCase(o[0], t.$schema);
+      if (o.rows[0]) {
+        return fixCase(o.rows[0], t.$schema);
       } else {
         return null;
       }
@@ -138,7 +142,7 @@ export class PGStore extends Storage {
     return Bluebird.resolve()
     .then(() => {
       if (sideInfo.self.query && sideInfo.self.query.requireLoad) {
-        return this.readOne(type, id);
+        return this.readAttributes(type, id);
       } else {
         return { id };
       }

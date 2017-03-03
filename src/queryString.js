@@ -3,71 +3,64 @@
 function selects(Model) {
   const selectArray = [];
   for (const attrName in Model.$schema.attributes) {
-    selectArray.push(`"${attrName}"`);
+    selectArray.push(`"${Model.$name}"."${attrName}"`);
   }
   for (const relName in Model.$schema.relationships) {
-    const rel = Model.$schema.relationships[relName];
-    const joinName = relName.toLowerCase();
+    const rel = Model.$schema.relationships[relName].type;
+    const otherName = rel.$sides[relName].otherName;
+    const otherFieldName = rel.$storeData.sql.joinFields[otherName];
     const extraAgg = [];
     if (rel.$extras) {
       for (const extra in rel.$extras) {
-        extraAgg.push(`'${extra}'`, `${joinName}.${extra}`);
+        extraAgg.push(`'${extra}'`, `"${relName}"."${extra}"`);
       }
     }
+    const extraString = `, 'meta', jsonb_build_object(${extraAgg.join(', ')})`;
     selectArray.push(
       `COALESCE(
         array_agg(
           distinct(
             jsonb_build_object(
-              '${rel.$sides[relName].other.field}', ${joinName}.${rel.$sides[relName].other.field},
-              '${rel.$sides[relName].self.field}', ${joinName}.${rel.$sides[relName].self.field}
-              ${extraAgg.length ? ',' + extraAgg.join(',') : ''}
+              'id', "${relName}"."${otherFieldName}"
+              ${extraAgg.length ? extraString : ''}
             )
           )
         )
-        FILTER (WHERE ${joinName}.${rel.$sides[relName].other.field} IS NOT NULL),
+        FILTER (WHERE "${relName}"."${otherFieldName}" IS NOT NULL),
         '{}')
-      as ${relName}`
+      as "${relName}"`
     );
   }
-  return { string: `select ${selectArray.join(', ')}`, raws: [] };
+  return `select ${selectArray.join(', ')}`;
 }
 
 function joins(Model) {
   const joinStrings = [];
-  const joinRaws = [];
   for (const relName in Model.$schema.relationships) {
-    const rel = Model.$schema.relationships[relName];
-    const joinName = relName.toLowerCase();
-    const restrictions = [];
-    if (rel.$restrict) {
-      for (const restriction in rel.$restrict) {
-        restrictions.push(` and ${joinName}.${restriction} = ?`);
-        joinRaws.push(`${rel.$restrict[restriction].value}`);
-      }
-    }
-    if (rel.$sides[relName].self.query) {
-      joinStrings.push('fancyquery');
+    const rel = Model.$schema.relationships[relName].type;
+    const sqlBlock = rel.$storeData.sql;
+    if (sqlBlock.joinQuery) {
+      joinStrings.push(
+        `left outer join ${rel.$name} as "${relName}" ${sqlBlock.joinQuery[relName]}`
+      );
     } else {
       joinStrings.push(
-        `left outer join ${rel.$name} as ${joinName} ` +
-        `on ${joinName}.${rel.$sides[relName].self.field} = ${Model.$name}.${Model.$id}`
+        `left outer join ${rel.$name} as "${relName}" `
+        + `on "${relName}".${sqlBlock.joinFields[relName]} = ${Model.$name}.${Model.$id}`
       );
     }
   }
+  return joinStrings.join('\n');
 }
 
-function wheres(Model) { }
+function wheres(Model) {
+  return `where ${Model.$name}.${Model.$id} = ?`;
+}
 
-function groupBy(Model) { }
+function groupBy(Model) {
+  return `group by ${Object.keys(Model.$schema.attributes).map((attrName) => `"${attrName}"`).join(', ')}`;
+}
 
-export function buildQuery(Model) {
-  const s = selects(Model);
-  const j = joins(Model);
-  const w = wheres(Model);
-  const g = groupBy(Model);
-  return {
-    string: `${s.string} from ${Model.$name} ${j.string} ${w.string} ${g.string};`,
-    raws: [].concat(s.raws).concat(j.raws).concat(w.raws).concat(g.raws),
-  };
+export function readQuery(Model) {
+  return `${selects(Model)} \nfrom ${Model.$name} \n${joins(Model)} \n${wheres(Model)} \n${groupBy(Model)};`;
 }

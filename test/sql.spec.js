@@ -61,15 +61,15 @@ function createDatabase(name) {
       CREATE TABLE tests (
         id integer not null primary key DEFAULT nextval('testid_seq'::regclass),
         name text,
-        othername text,
+        "otherName" text,
         extended jsonb not null default '{}'::jsonb
       );
       CREATE TABLE parent_child_relationship (parent_id integer not null, child_id integer not null);
       CREATE UNIQUE INDEX children_join on parent_child_relationship (parent_id, child_id);
-      CREATE TABLE reactions (parent_id integer not null, child_id integer not null, reaction text not null);
-      CREATE UNIQUE INDEX reactions_join on reactions (parent_id, child_id, reaction);
       CREATE TABLE valence_children (parent_id integer not null, child_id integer not null, perm integer not null);
+      CREATE UNIQUE INDEX valence_children_join on valence_children (parent_id, child_id);
       CREATE TABLE query_children (parent_id integer not null, child_id integer not null, perm integer not null);
+      CREATE UNIQUE INDEX query_children_join on query_children (parent_id, child_id);
     `, { database: name });
   });
 }
@@ -93,8 +93,8 @@ testSuite({
   name: 'Plump Postgres Store',
   before: () => createDatabase('plump_test'),
   after: (driver) => {
-    return driver.teardown()
-    .then(() => runSQL('DROP DATABASE plump_test;'));
+    // return driver.teardown()
+    // .then(() => runSQL('DROP DATABASE plump_test;'));
   },
 });
 
@@ -161,6 +161,29 @@ describe('postgres-specific behaviors', () => {
           children: [],
           parents: [],
         }));
+      });
+    });
+  });
+
+  it('supports queries in hasMany relationships', () => {
+    return store.write(TestType, sampleObject)
+    .then((createdObject) => {
+      return store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 })
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
+      .then(() => {
+        return expect(store.read(TestType, createdObject.id, 'queryChildren'))
+        .to.eventually.have.property('relationships').that.deep.equals({
+          queryChildren: [
+            {
+              id: 102,
+              meta: { perm: 2 },
+            }, {
+              id: 103,
+              meta: { perm: 3 },
+            },
+          ],
+        });
       });
     });
   });
