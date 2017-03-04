@@ -14,27 +14,6 @@ function fixCase(data, schema) {
   return data;
 }
 
-function deserializeWhere(query, block) {
-  const car = block[0];
-  const cdr = block.slice(1);
-  if (Array.isArray(cdr[0])) {
-    return cdr.reduce((subQuery, subBlock) => deserializeWhere(subQuery, subBlock), query);
-  } else {
-    return query[car].apply(query, cdr);
-  }
-}
-
-function objectToWhereChain(query, block, context) {
-  return Object.keys(block).reduce((q, key) => {
-    if (Array.isArray(block[key])) {
-      return deserializeWhere(query, Storage.massReplace(block[key], context));
-    } else {
-      return q.where(key, block[key]);
-    }
-  }, query);
-}
-
-
 export class PGStore extends Storage {
   constructor(opts = {}) {
     super(opts);
@@ -79,11 +58,11 @@ export class PGStore extends Storage {
         if (v.attributes[attrName] !== undefined) {
           // copy from v to the best of our ability
           if (t.$schema.attributes[attrName].type === 'array') {
-            updateObject[attrName.toLowerCase()] = v.attributes[attrName].concat();
+            updateObject[attrName] = v.attributes[attrName].concat();
           } else if (t.$schema.attributes[attrName].type === 'object') {
-            updateObject[attrName.toLowerCase()] = Object.assign({}, v.attributes[attrName]);
+            updateObject[attrName] = Object.assign({}, v.attributes[attrName]);
           } else {
-            updateObject[attrName.toLowerCase()] = v.attributes[attrName];
+            updateObject[attrName] = v.attributes[attrName];
           }
         }
       }
@@ -114,46 +93,29 @@ export class PGStore extends Storage {
     return this[$knex].raw(query, id)
     .then((o) => {
       if (o.rows[0]) {
-        return fixCase(o.rows[0], t.$schema);
+        return o.rows[0];
       } else {
         return null;
       }
     });
   }
 
-  readMany(type, id, relationshipTitle) {
-    const relationshipBlock = type.$schema.relationships[relationshipTitle];
-    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
-    let toSelect = [sideInfo.other.field, sideInfo.self.field];
-    if (relationshipBlock.type.$extras) {
-      toSelect = toSelect.concat(Object.keys(relationshipBlock.type.$extras));
+  readRelationship(type, id, relName) {
+    const rel = type.$schema.relationships[relName].type;
+    const otherRelName = rel.$sides[relName].otherName;
+    const sqlData = rel.$storeData.sql;
+    const selectBase = `"${rel.$name}"."${sqlData.joinFields[otherRelName]}" as id`;
+    let selectExtras = '';
+    if (rel.$extras) {
+      selectExtras = `, jsonb_build_object(${Object.keys(rel.$extras).map((extra) => `'${extra}', "${rel.$name}"."${extra}"`).join(', ')}) as meta`; // eslint-disable-line max-len
     }
-    const whereBlock = {};
-    if (sideInfo.self.query) {
-      whereBlock[sideInfo.self.field] = sideInfo.self.query.logic;
-    } else {
-      whereBlock[sideInfo.self.field] = id;
-    }
-    if (relationshipBlock.type.$restrict) {
-      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
-        whereBlock[restriction] = relationshipBlock.type.$restrict[restriction].value;
-      });
-    }
-    return Bluebird.resolve()
-    .then(() => {
-      if (sideInfo.self.query && sideInfo.self.query.requireLoad) {
-        return this.readAttributes(type, id);
-      } else {
-        return { id };
-      }
-    })
-    .then((context) => {
-      return objectToWhereChain(this[$knex](relationshipBlock.type.$name), whereBlock, context)
-      .select(toSelect);
-    })
+
+    return this[$knex](rel.$name)
+    .where(sqlData.joinFields[relName], id)
+    .select(this[$knex].raw(`${selectBase}${selectExtras}`))
     .then((l) => {
       return {
-        [relationshipTitle]: l,
+        [relName]: l,
       };
     });
   }
@@ -163,65 +125,54 @@ export class PGStore extends Storage {
     .then((o) => o);
   }
 
-  add(type, id, relationshipTitle, childId, extras = {}) {
-    const relationshipBlock = type.$schema.relationships[relationshipTitle];
-    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
+  add(type, id, relName, childId, extras = {}) {
+    const rel = type.$schema.relationships[relName].type;
+    const otherRelName = rel.$sides[relName].otherName;
+    const sqlData = rel.$storeData.sql;
     const newField = {
-      [sideInfo.other.field]: childId,
-      [sideInfo.self.field]: id,
+      [sqlData.joinFields[otherRelName]]: childId,
+      [sqlData.joinFields[relName]]: id,
     };
-    if (relationshipBlock.type.$restrict) {
-      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
-        newField[restriction] = relationshipBlock.type.$restrict[restriction].value;
-      });
-    }
-    if (relationshipBlock.type.$extras) {
-      Object.keys(relationshipBlock.type.$extras).forEach((extra) => {
+    if (rel.$extras) {
+      Object.keys(rel.$extras).forEach((extra) => {
         newField[extra] = extras[extra];
       });
     }
-    return this[$knex](relationshipBlock.type.$name)
+    return this[$knex](rel.$name)
     .insert(newField)
-    .then(() => this.notifyUpdate(type, id, null, relationshipTitle));
+    .then(() => this.notifyUpdate(type, id, null, relName));
   }
 
-  modifyRelationship(type, id, relationshipTitle, childId, extras = {}) {
-    const relationshipBlock = type.$schema.relationships[relationshipTitle];
-    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
+  modifyRelationship(type, id, relName, childId, extras = {}) {
+    const rel = type.$schema.relationships[relName].type;
+    const otherRelName = rel.$sides[relName].otherName;
+    const sqlData = rel.$storeData.sql;
     const newField = {};
-    Object.keys(relationshipBlock.type.$extras).forEach((extra) => {
+    Object.keys(rel.$extras).forEach((extra) => {
       if (extras[extra] !== undefined) {
         newField[extra] = extras[extra];
       }
     });
-    const whereBlock = {
-      [sideInfo.other.field]: childId,
-      [sideInfo.self.field]: id,
-    };
-    if (relationshipBlock.type.$restrict) {
-      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
-        whereBlock[restriction] = relationshipBlock.type.$restrict[restriction].value;
-      });
-    }
-    return objectToWhereChain(this[$knex](relationshipBlock.type.$name), whereBlock, { id, childId })
+    return this[$knex](rel.$name)
+    .where({
+      [sqlData.joinFields[otherRelName]]: childId,
+      [sqlData.joinFields[relName]]: id,
+    })
     .update(newField)
-    .then(() => this.notifyUpdate(type, id, null, relationshipTitle));
+    .then(() => this.notifyUpdate(type, id, null, relName));
   }
 
-  remove(type, id, relationshipTitle, childId) {
-    const relationshipBlock = type.$schema.relationships[relationshipTitle];
-    const sideInfo = relationshipBlock.type.$sides[relationshipTitle];
-    const whereBlock = {
-      [sideInfo.other.field]: childId,
-      [sideInfo.self.field]: id,
-    };
-    if (relationshipBlock.type.$restrict) {
-      Object.keys(relationshipBlock.type.$restrict).forEach((restriction) => {
-        whereBlock[restriction] = relationshipBlock.type.$restrict[restriction].value;
-      });
-    }
-    return objectToWhereChain(this[$knex](relationshipBlock.type.$name), whereBlock).delete()
-    .then(() => this.notifyUpdate(type, id, null, relationshipTitle));
+  remove(type, id, relName, childId) {
+    const rel = type.$schema.relationships[relName].type;
+    const otherRelName = rel.$sides[relName].otherName;
+    const sqlData = rel.$storeData.sql;
+    return this[$knex](rel.$name)
+    .where({
+      [sqlData.joinFields[otherRelName]]: childId,
+      [sqlData.joinFields[relName]]: id,
+    })
+    .delete()
+    .then(() => this.notifyUpdate(type, id, null, relName));
   }
 
   query(q) {

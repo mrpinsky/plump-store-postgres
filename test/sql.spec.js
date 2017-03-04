@@ -93,17 +93,19 @@ testSuite({
   name: 'Plump Postgres Store',
   before: () => createDatabase('plump_test'),
   after: (driver) => {
-    // return driver.teardown()
-    // .then(() => runSQL('DROP DATABASE plump_test;'));
+    return driver.teardown()
+    .then(() => runSQL('DROP DATABASE plump_test;'));
   },
 });
 
 const sampleObject = {
-  name: 'potato',
-  otherName: 'elephantine',
-  extended: {
-    actual: 'rutabaga',
-    otherValue: 42,
+  attributes: {
+    name: 'potato',
+    otherName: 'elephantine',
+    extended: {
+      actual: 'rutabaga',
+      otherValue: 42,
+    },
   },
 };
 
@@ -129,38 +131,34 @@ describe('postgres-specific behaviors', () => {
   it('Returns extra contents', () => {
     return store.write(TestType, sampleObject)
     .then((createdObject) => {
-      return store.add(TestType, createdObject.id, 'likers', 100)
-      .then(() => store.add(TestType, createdObject.id, 'likers', 101))
-      .then(() => store.add(TestType, createdObject.id, 'agreers', 100))
-      .then(() => store.add(TestType, createdObject.id, 'agreers', 101))
-      .then(() => store.add(TestType, createdObject.id, 'valenceChildren', 100, { perm: 1 }))
+      return store.add(TestType, createdObject.id, 'valenceChildren', 100, { perm: 1 })
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 }))
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
       .then(() => {
-        return expect(store.read(TestType, createdObject.id))
-        .to.eventually.deep.equal(Object.assign({}, sampleObject, {
+        const resultObject = Object.assign({}, sampleObject);
+        resultObject.id = createdObject.id;
+        resultObject.attributes = Object.assign({}, resultObject.attributes, {
           [TestType.$id]: createdObject.id,
-          likers: [
-            { child_id: createdObject.id, parent_id: 100 },
-            { child_id: createdObject.id, parent_id: 101 }],
-          agreers: [
-            { child_id: createdObject.id, parent_id: 100 },
-            { child_id: createdObject.id, parent_id: 101 }],
+        });
+        resultObject.relationships = Object.assign({}, resultObject.relationships, {
           queryChildren: [
-            { parent_id: createdObject.id, child_id: 102, perm: 2 },
-            { parent_id: createdObject.id, child_id: 103, perm: 3 },
+            { id: 102, perm: 2 },
+            { id: 103, perm: 3 },
           ],
           queryParents: [],
-          likees: [],
-          agreees: [],
           valenceChildren: [
-            { parent_id: createdObject.id, child_id: 100, perm: 1 },
+            { id: 100, meta: { perm: 1 } },
           ],
           valenceParents: [],
           children: [],
           parents: [],
-        }));
+        });
+        return store.read(TestType, createdObject.id)
+        .then((res) => {
+          debugger;
+          return expect(res).to.deep.equal(resultObject);
+        });
       });
     });
   });
@@ -189,7 +187,7 @@ describe('postgres-specific behaviors', () => {
   });
 
   after(() => {
-    return store.teardown();
-    // .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
+    return store.teardown()
+    .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
   });
 });
