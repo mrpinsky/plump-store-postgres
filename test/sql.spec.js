@@ -6,6 +6,7 @@ import { TestType } from 'plump/test/testType';
 import { testSuite } from 'plump/test/storageTests';
 import * as pg from 'pg';
 import chai from 'chai';
+import Bluebird from 'bluebird';
 import chaiSubset from 'chai-subset';
 import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiSubset);
@@ -184,6 +185,27 @@ describe('postgres-specific behaviors', () => {
             ],
           },
         });
+      });
+    });
+  });
+
+  it('returns many objects in a bulk Query', () => {
+    return Bluebird.all([
+      store.write(TestType, sampleObject),
+      store.write(TestType, sampleObject),
+      store.write(TestType, sampleObject),
+      store.write(TestType, sampleObject),
+      store.write(TestType, sampleObject),
+    ])
+    .then((created) => {
+      const createdObject = created[0];
+      return store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 })
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
+      .then(() => store.bulkRead(TestType, createdObject.id))
+      .then((res) => {
+        console.log(res);
+        return expect(res).to.have.property('included').with.length(4);
       });
     });
   });

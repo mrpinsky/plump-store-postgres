@@ -1,7 +1,7 @@
 import Bluebird from 'bluebird';
 import knex from 'knex';
 import { Storage } from 'plump';
-import { readQuery } from './queryString';
+import { readQuery, bulkQuery } from './queryString';
 const $knex = Symbol('$knex');
 
 function rearrangeData(type, data) {
@@ -99,6 +99,23 @@ export class PGStore extends Storage {
     .then((o) => {
       if (o.rows[0]) {
         return rearrangeData(t, o.rows[0]);
+      } else {
+        return null;
+      }
+    });
+  }
+
+  bulkRead(t, id) {
+    let query = t.cacheGet(this, 'bulkRead');
+    if (query === undefined) {
+      query = bulkQuery(t);
+      t.cacheSet(this, 'bulkRead', query);
+    }
+    return this[$knex].raw(query, id)
+    .then((o) => {
+      if (o.rows[0]) {
+        return o.rows;
+        // return rearrangeData(t, o.rows[0]);
       } else {
         return null;
       }
