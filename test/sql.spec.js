@@ -61,15 +61,15 @@ function createDatabase(name) {
       CREATE TABLE tests (
         id integer not null primary key DEFAULT nextval('testid_seq'::regclass),
         name text,
-        othername text,
+        "otherName" text,
         extended jsonb not null default '{}'::jsonb
       );
       CREATE TABLE parent_child_relationship (parent_id integer not null, child_id integer not null);
       CREATE UNIQUE INDEX children_join on parent_child_relationship (parent_id, child_id);
-      CREATE TABLE reactions (parent_id integer not null, child_id integer not null, reaction text not null);
-      CREATE UNIQUE INDEX reactions_join on reactions (parent_id, child_id, reaction);
       CREATE TABLE valence_children (parent_id integer not null, child_id integer not null, perm integer not null);
+      CREATE UNIQUE INDEX valence_children_join on valence_children (parent_id, child_id);
       CREATE TABLE query_children (parent_id integer not null, child_id integer not null, perm integer not null);
+      CREATE UNIQUE INDEX query_children_join on query_children (parent_id, child_id);
     `, { database: name });
   });
 }
@@ -99,11 +99,13 @@ testSuite({
 });
 
 const sampleObject = {
-  name: 'potato',
-  otherName: 'elephantine',
-  extended: {
-    actual: 'rutabaga',
-    otherValue: 42,
+  attributes: {
+    name: 'potato',
+    otherName: 'elephantine',
+    extended: {
+      actual: 'rutabaga',
+      otherValue: 42,
+    },
   },
 };
 
@@ -129,44 +131,65 @@ describe('postgres-specific behaviors', () => {
   it('Returns extra contents', () => {
     return store.write(TestType, sampleObject)
     .then((createdObject) => {
-      return store.add(TestType, createdObject.id, 'likers', 100)
-      .then(() => store.add(TestType, createdObject.id, 'likers', 101))
-      .then(() => store.add(TestType, createdObject.id, 'agreers', 100))
-      .then(() => store.add(TestType, createdObject.id, 'agreers', 101))
-      .then(() => store.add(TestType, createdObject.id, 'valenceChildren', 100, { perm: 1 }))
+      return store.add(TestType, createdObject.id, 'valenceChildren', 100, { perm: 1 })
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 }))
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
       .then(() => {
-        return expect(store.read(TestType, createdObject.id))
-        .to.eventually.deep.equal(Object.assign({}, sampleObject, {
+        const resultObject = Object.assign({}, sampleObject);
+        resultObject.id = createdObject.id;
+        resultObject.attributes = Object.assign({}, resultObject.attributes, {
           [TestType.$id]: createdObject.id,
-          likers: [
-            { child_id: createdObject.id, parent_id: 100 },
-            { child_id: createdObject.id, parent_id: 101 }],
-          agreers: [
-            { child_id: createdObject.id, parent_id: 100 },
-            { child_id: createdObject.id, parent_id: 101 }],
+        });
+        resultObject.type = TestType.$name;
+        resultObject.relationships = Object.assign({}, resultObject.relationships, {
           queryChildren: [
-            { parent_id: createdObject.id, child_id: 102, perm: 2 },
-            { parent_id: createdObject.id, child_id: 103, perm: 3 },
+            { id: 102, meta: { perm: 2 } },
+            { id: 103, meta: { perm: 3 } },
           ],
           queryParents: [],
-          likees: [],
-          agreees: [],
           valenceChildren: [
-            { parent_id: createdObject.id, child_id: 100, perm: 1 },
+            { id: 100, meta: { perm: 1 } },
           ],
           valenceParents: [],
           children: [],
           parents: [],
-        }));
+        });
+        return store.read(TestType, createdObject.id)
+        .then((res) => {
+          return expect(res).to.deep.equal(resultObject);
+        });
+      });
+    });
+  });
+
+  it('supports queries in hasMany relationships', () => {
+    return store.write(TestType, sampleObject)
+    .then((createdObject) => {
+      return store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 })
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
+      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
+      .then(() => {
+        return expect(store.read(TestType, createdObject.id, 'queryChildren'))
+        .to.eventually.deep.containSubset({
+          relationships: {
+            queryChildren: [
+              {
+                id: 102,
+                meta: { perm: 2 },
+              }, {
+                id: 103,
+                meta: { perm: 3 },
+              },
+            ],
+          },
+        });
       });
     });
   });
 
   after(() => {
-    return store.teardown();
-    // .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
+    return store.teardown()
+    .then(() => runSQL('DROP DATABASE secondary_plump_test;'));
   });
 });
