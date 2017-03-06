@@ -4,14 +4,19 @@ import { Storage } from 'plump';
 import { readQuery } from './queryString';
 const $knex = Symbol('$knex');
 
-function fixCase(data, schema) {
-  Object.keys(schema.attributes).concat(Object.keys(schema.relationships)).forEach((key) => {
-    if ((key.toLowerCase() !== key) && (data[key.toLowerCase()])) {
-      data[key] = data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
-      delete data[key.toLowerCase()]; // eslint-disable-line no-param-reassign
-    }
-  });
-  return data;
+function rearrangeData(type, data) {
+  const retVal = {
+    type: type.$name,
+    attributes: {},
+    relationships: {},
+  };
+  for (const attrName in type.$schema.attributes) {
+    retVal.attributes[attrName] = data[attrName];
+  }
+  for (const relName in type.$schema.relationships) {
+    retVal.relationships[relName] = data[relName];
+  }
+  return retVal;
 }
 
 export class PGStore extends Storage {
@@ -93,7 +98,7 @@ export class PGStore extends Storage {
     return this[$knex].raw(query, id)
     .then((o) => {
       if (o.rows[0]) {
-        return o.rows[0];
+        return rearrangeData(t, o.rows[0]);
       } else {
         return null;
       }

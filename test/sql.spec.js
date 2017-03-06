@@ -141,10 +141,11 @@ describe('postgres-specific behaviors', () => {
         resultObject.attributes = Object.assign({}, resultObject.attributes, {
           [TestType.$id]: createdObject.id,
         });
+        resultObject.type = TestType.$name;
         resultObject.relationships = Object.assign({}, resultObject.relationships, {
           queryChildren: [
-            { id: 102, perm: 2 },
-            { id: 103, perm: 3 },
+            { id: 102, meta: { perm: 2 } },
+            { id: 103, meta: { perm: 3 } },
           ],
           queryParents: [],
           valenceChildren: [
@@ -156,7 +157,6 @@ describe('postgres-specific behaviors', () => {
         });
         return store.read(TestType, createdObject.id)
         .then((res) => {
-          debugger;
           return expect(res).to.deep.equal(resultObject);
         });
       });
@@ -171,16 +171,18 @@ describe('postgres-specific behaviors', () => {
       .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
       .then(() => {
         return expect(store.read(TestType, createdObject.id, 'queryChildren'))
-        .to.eventually.have.property('relationships').that.deep.equals({
-          queryChildren: [
-            {
-              id: 102,
-              meta: { perm: 2 },
-            }, {
-              id: 103,
-              meta: { perm: 3 },
-            },
-          ],
+        .to.eventually.deep.containSubset({
+          relationships: {
+            queryChildren: [
+              {
+                id: 102,
+                meta: { perm: 2 },
+              }, {
+                id: 103,
+                meta: { perm: 3 },
+              },
+            ],
+          },
         });
       });
     });
