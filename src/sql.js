@@ -9,6 +9,7 @@ function rearrangeData(type, data) {
     type: type.$name,
     attributes: {},
     relationships: {},
+    id: data[type.$schema.$id],
   };
   for (const attrName in type.$schema.attributes) {
     retVal.attributes[attrName] = data[attrName];
@@ -114,8 +115,10 @@ export class PGStore extends Storage {
     return this[$knex].raw(query, id)
     .then((o) => {
       if (o.rows[0]) {
-        return o.rows;
-        // return rearrangeData(t, o.rows[0]);
+        const arrangedArray = o.rows.map((row) => rearrangeData(t, row));
+        const rootItem = arrangedArray.filter((it) => it.id === id)[0];
+        rootItem.included = arrangedArray.filter((it) => it.id !== id);
+        return rootItem;
       } else {
         return null;
       }

@@ -199,13 +199,23 @@ describe('postgres-specific behaviors', () => {
     ])
     .then((created) => {
       const createdObject = created[0];
-      return store.add(TestType, createdObject.id, 'queryChildren', 101, { perm: 1 })
-      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 102, { perm: 2 }))
-      .then(() => store.add(TestType, createdObject.id, 'queryChildren', 103, { perm: 3 }))
+      return Bluebird.all(created.map((obj) => {
+        return Bluebird.all([
+          store.add(TestType, obj.id, 'children', obj.id * 100 + 1),
+          store.add(TestType, obj.id, 'children', obj.id * 100 + 2),
+          store.add(TestType, obj.id, 'children', obj.id * 100 + 3),
+        ]);
+      }))
       .then(() => store.bulkRead(TestType, createdObject.id))
       .then((res) => {
-        console.log(res);
-        return expect(res).to.have.property('included').with.length(4);
+        expect(res).to.have.property('included').with.length(4);
+        res.included.forEach((i) => {
+          expect(i.relationships.children).to.deep.equal([
+            { id: i.id * 100 + 1 },
+            { id: i.id * 100 + 2 },
+            { id: i.id * 100 + 3 },
+          ]);
+        });
       });
     });
   });
