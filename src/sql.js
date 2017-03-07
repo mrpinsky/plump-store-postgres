@@ -1,7 +1,7 @@
 import Bluebird from 'bluebird';
 import knex from 'knex';
 import { Storage } from 'plump';
-import { readQuery } from './queryString';
+import { readQuery, bulkQuery } from './queryString';
 const $knex = Symbol('$knex');
 
 function rearrangeData(type, data) {
@@ -9,6 +9,7 @@ function rearrangeData(type, data) {
     type: type.$name,
     attributes: {},
     relationships: {},
+    id: data[type.$schema.$id],
   };
   for (const attrName in type.$schema.attributes) {
     retVal.attributes[attrName] = data[attrName];
@@ -99,6 +100,25 @@ export class PGStore extends Storage {
     .then((o) => {
       if (o.rows[0]) {
         return rearrangeData(t, o.rows[0]);
+      } else {
+        return null;
+      }
+    });
+  }
+
+  bulkRead(t, id) {
+    let query = t.cacheGet(this, 'bulkRead');
+    if (query === undefined) {
+      query = bulkQuery(t);
+      t.cacheSet(this, 'bulkRead', query);
+    }
+    return this[$knex].raw(query, id)
+    .then((o) => {
+      if (o.rows[0]) {
+        const arrangedArray = o.rows.map((row) => rearrangeData(t, row));
+        const rootItem = arrangedArray.filter((it) => it.id === id)[0];
+        rootItem.included = arrangedArray.filter((it) => it.id !== id);
+        return rootItem;
       } else {
         return null;
       }

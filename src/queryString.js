@@ -53,14 +53,32 @@ function joins(Model) {
   return joinStrings.join('\n');
 }
 
-function wheres(Model) {
-  return `where ${Model.$name}.${Model.$id} = ?`;
+function singleWhere(Model) {
+  if (Model.$storeData && Model.$storeData.sql && Model.$storeData.sql.singleQuery) {
+    return Model.$storeData.sql.singleQuery;
+  } else {
+    return `where ${Model.$name}.${Model.$id} = ?`;
+  }
+}
+
+function bulkWhere(Model) {
+  if (Model.$storeData && Model.$storeData.sql && Model.$storeData.sql.bulkQuery) {
+    return Model.$storeData.sql.bulkQuery;
+  } else if (Model.$storeData && Model.$storeData.sql && Model.$storeData.sql.singleQuery) {
+    return Model.$storeData.sql.singleQuery;
+  } else {
+    return `where ${Model.$name}.${Model.$id} = ?`;
+  }
 }
 
 function groupBy(Model) {
   return `group by ${Object.keys(Model.$schema.attributes).map((attrName) => `"${attrName}"`).join(', ')}`;
 }
 
+export function bulkQuery(Model) {
+  return `${selects(Model)} \nfrom ${Model.$name} \n${joins(Model)} \n${bulkWhere(Model)} \n${groupBy(Model)};`;
+}
+
 export function readQuery(Model) {
-  return `${selects(Model)} \nfrom ${Model.$name} \n${joins(Model)} \n${wheres(Model)} \n${groupBy(Model)};`;
+  return `${selects(Model)} \nfrom ${Model.$name} \n${joins(Model)} \n${singleWhere(Model)} \n${groupBy(Model)};`;
 }
