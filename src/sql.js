@@ -122,10 +122,10 @@ export class PGStore extends Storage {
       if (Object.keys(updateObject).length > 0) {
         return this.writeAttributes(t, updateObject, id);
       } else {
-        return null;
+        return v;
       }
     }).then((r) => {
-      if (v.relationships) {
+      if (v.relationships && r.id) {
         return this.writeRelationships(t, v, r.id).then(() => r);
       } else {
         return r;
