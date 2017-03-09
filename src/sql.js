@@ -117,8 +117,14 @@ export class PGStore extends Storage {
         }
       }
     }
-    return this.writeAttributes(t, updateObject, id)
-    .then((r) => {
+    return Bluebird.resolve()
+    .then(() => {
+      if (Object.keys(updateObject).length > 0) {
+        return this.writeAttributes(t, updateObject, id);
+      } else {
+        return null;
+      }
+    }).then((r) => {
       if (v.relationships) {
         return this.writeRelationships(t, v, r.id).then(() => r);
       } else {
