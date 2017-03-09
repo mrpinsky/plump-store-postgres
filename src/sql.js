@@ -55,37 +55,77 @@ export class PGStore extends Storage {
     return this[$knex].destroy();
   }
 
-  write(t, v) {
+  writeRelationships(t, v, id) {
     return Bluebird.resolve()
     .then(() => {
-      const id = v.id;
-      const updateObject = {};
-      for (const attrName in t.$schema.attributes) {
-        if (v.attributes[attrName] !== undefined) {
-          // copy from v to the best of our ability
-          if (t.$schema.attributes[attrName].type === 'array') {
-            updateObject[attrName] = v.attributes[attrName].concat();
-          } else if (t.$schema.attributes[attrName].type === 'object') {
-            updateObject[attrName] = Object.assign({}, v.attributes[attrName]);
+      return Bluebird.all(Object.keys(t.$schema.relationships).map((relName) => {
+        if (v.relationships && v.relationships[relName] && v.relationships[relName].length > 0) {
+          if (v.relationships[relName][0].op) {
+            // deltas
+            return Bluebird.all(v.relationships[relName].map((delta) => {
+              if (delta.op === 'add') {
+                return this.add(t, id, relName, delta.data.id, delta.data.meta || {});
+              } else if (delta.op === 'remove') {
+                return this.remove(t, id, relName, delta.data.id);
+              } else if (delta.op === 'modify') {
+                return this.modifyRelationship(t, id, relName, delta.data.id);
+              } else {
+                return null;
+              }
+            }));
           } else {
-            updateObject[attrName] = v.attributes[attrName];
+            // items rather than deltas
+            return Bluebird.all(v.relationships[relName].map((item) => {
+              return this.add(t, id, relName, item.id, item.meta || {});
+            }));
           }
+        } else {
+          return null;
+        }
+      }));
+    });
+  }
+
+  writeAttributes(t, updateObject, id) {
+    if ((id === undefined) && (this.terminal)) {
+      return this[$knex](t.$name).insert(updateObject).returning(t.$schema.$id)
+      .then((createdId) => {
+        return this.read(t, createdId[0]);
+      });
+    } else if (id !== undefined) {
+      return this[$knex](t.$name).where({ [t.$schema.$id]: id }).update(updateObject)
+      .then(() => {
+        return this.read(t, id);
+      });
+    } else {
+      throw new Error('Cannot create new content in a non-terminal store');
+    }
+  }
+
+  write(t, v) {
+    const id = v.id;
+    const updateObject = {};
+    for (const attrName in t.$schema.attributes) {
+      if (v.attributes[attrName] !== undefined) {
+        // copy from v to the best of our ability
+        if (t.$schema.attributes[attrName].type === 'array') {
+          updateObject[attrName] = v.attributes[attrName].concat();
+        } else if (t.$schema.attributes[attrName].type === 'object') {
+          updateObject[attrName] = Object.assign({}, v.attributes[attrName]);
+        } else {
+          updateObject[attrName] = v.attributes[attrName];
         }
       }
-      if ((id === undefined) && (this.terminal)) {
-        return this[$knex](t.$name).insert(updateObject).returning(t.$schema.$id)
-        .then((createdId) => {
-          return this.read(t, createdId[0]);
-        });
-      } else if (id !== undefined) {
-        return this[$knex](t.$name).where({ [t.$schema.$id]: id }).update(updateObject)
-        .then(() => {
-          return this.read(t, id);
-        });
+    }
+    return this.writeAttributes(t, updateObject, id)
+    .then((r) => {
+      if (v.relationships) {
+        return this.writeRelationships(t, v, r.id).then(() => r);
       } else {
-        throw new Error('Cannot create new content in a non-terminal store');
+        return r;
       }
-    }).then((result) => {
+    })
+    .then((result) => {
       return this.notifyUpdate(t, result[t.$schema.$id], result).then(() => result);
     });
   }
@@ -117,8 +157,10 @@ export class PGStore extends Storage {
       if (o.rows[0]) {
         const arrangedArray = o.rows.map((row) => rearrangeData(t, row));
         const rootItem = arrangedArray.filter((it) => it.id === id)[0];
-        rootItem.included = arrangedArray.filter((it) => it.id !== id);
-        return rootItem;
+        return {
+          data: rootItem,
+          included: arrangedArray.filter((it) => it.id !== id),
+        };
       } else {
         return null;
       }
