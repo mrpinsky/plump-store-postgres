@@ -102,41 +102,56 @@ export class PGStore extends Storage {
     }
   }
 
-  write(t, v) {
-    const id = v.id;
+  write(value) {
+    const id = value.id;
+    const type = this.getType(value.type);
     const updateObject = {};
-    for (const attrName in t.$schema.attributes) {
-      if (v.attributes[attrName] !== undefined) {
+    for (const attrName in type.$schema.attributes) {
+      if (value.attributes[attrName] !== undefined) {
         // copy from v to the best of our ability
-        if (t.$schema.attributes[attrName].type === 'array') {
-          updateObject[attrName] = v.attributes[attrName].concat();
-        } else if (t.$schema.attributes[attrName].type === 'object') {
-          updateObject[attrName] = Object.assign({}, v.attributes[attrName]);
+        if (type.$schema.attributes[attrName].type === 'array') {
+          updateObject[attrName] = value.attributes[attrName].concat();
+        } else if (type.$schema.attributes[attrName].type === 'object') {
+          updateObject[attrName] = Object.assign({}, value.attributes[attrName]);
         } else {
-          updateObject[attrName] = v.attributes[attrName];
+          updateObject[attrName] = value.attributes[attrName];
         }
       }
     }
     return Bluebird.resolve()
     .then(() => {
       if (Object.keys(updateObject).length > 0) {
-        return this.writeAttributes(t, updateObject, id);
+        return this.writeAttributes(type, updateObject, id)
+        .then((result) => {
+          this.fireWriteUpdate({
+            type: value.type,
+            id: result.id,
+            invalidate: ['attributes'],
+          });
+          return result;
+        });
       } else {
-        return v;
+        return value;
       }
     }).then((r) => {
-      if (v.relationships && r.id) {
-        return this.writeRelationships(t, v, r.id).then(() => r);
+      if (value.relationships && r.id && Object.keys(value.relationships) > 0) {
+        return this.writeRelationships(type, value, r.id)
+        .then((result) => {
+          this.fireWriteUpdate({
+            type: value.type,
+            id: result.id,
+            invalidate: Object.keys(value.relationships),
+          });
+          return r;
+        });
       } else {
         return r;
       }
-    })
-    .then((result) => {
-      return this.notifyUpdate(t, result[t.$schema.$id], result).then(() => result);
     });
   }
 
-  readAttributes(t, id) {
+  readAttributes(typeName, id) {
+    const t = this.getType(typeName);
     let query = t.cacheGet(this, 'readAttributes');
     if (query === undefined) {
       query = readQuery(t);
@@ -152,7 +167,8 @@ export class PGStore extends Storage {
     });
   }
 
-  bulkRead(t, id) {
+  bulkRead(typeName, id) {
+    const t = this.getType(typeName);
     let query = t.cacheGet(this, 'bulkRead');
     if (query === undefined) {
       query = bulkQuery(t);
@@ -173,7 +189,8 @@ export class PGStore extends Storage {
     });
   }
 
-  readRelationship(type, id, relName) {
+  readRelationship(typeName, id, relName) {
+    const type = this.getType(typeName);
     const rel = type.$schema.relationships[relName].type;
     const otherRelName = rel.$sides[relName].otherName;
     const sqlData = rel.$storeData.sql;
@@ -193,12 +210,14 @@ export class PGStore extends Storage {
     });
   }
 
-  delete(t, id) {
-    return this[$knex](t.$name).where({ [t.$schema.$id]: id }).delete()
+  delete(typeName, id) {
+    const type = this.getType(typeName);
+    return this[$knex](typeName).where({ [type.$schema.$id]: id }).delete()
     .then((o) => o);
   }
 
-  add(type, id, relName, childId, extras = {}) {
+  add(typeName, id, relName, childId, extras = {}) {
+    const type = this.getType(typeName);
     const rel = type.$schema.relationships[relName].type;
     const otherRelName = rel.$sides[relName].otherName;
     const sqlData = rel.$storeData.sql;
@@ -216,7 +235,8 @@ export class PGStore extends Storage {
     .then(() => this.notifyUpdate(type, id, null, relName));
   }
 
-  modifyRelationship(type, id, relName, childId, extras = {}) {
+  modifyRelationship(typeName, id, relName, childId, extras = {}) {
+    const type = this.getType(typeName);
     const rel = type.$schema.relationships[relName].type;
     const otherRelName = rel.$sides[relName].otherName;
     const sqlData = rel.$storeData.sql;
@@ -235,7 +255,8 @@ export class PGStore extends Storage {
     .then(() => this.notifyUpdate(type, id, null, relName));
   }
 
-  remove(type, id, relName, childId) {
+  remove(typeName, id, relName, childId) {
+    const type = this.getType(typeName);
     const rel = type.$schema.relationships[relName].type;
     const otherRelName = rel.$sides[relName].otherName;
     const sqlData = rel.$storeData.sql;
