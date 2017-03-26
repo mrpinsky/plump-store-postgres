@@ -2,6 +2,6 @@ module.exports = {
   dest: 'dist',
   src: 'src',
   types: 'types',
-  scripts: ['**/*.js'],
+  scripts: ['**/*.ts'],
   typings: ['**/*.d.ts'],
 };
