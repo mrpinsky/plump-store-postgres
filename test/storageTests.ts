@@ -273,6 +273,7 @@ export function testSuite(context, storeOpts ) {
           return expect(actualStore.read({ typeName: 'tests', id: testItem.id }))
           .to.eventually.have.deep.property('attributes.name', 'potato');
         }).then(() => actualStore.writeRelationshipItem({ typeName: 'tests', id: testItem.id }, 'children', { id: 100 }))
+        .then(() => new Bluebird((resolve) => setTimeout(resolve, 100)))
         .then(() => {
           return expect(memstore.read({ typeName: 'tests', id: testItem.id }))
           .to.eventually.not.have.deep.property('relationships.children');

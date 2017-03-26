@@ -6,23 +6,30 @@ export function writeRelationshipQuery(schema: ModelSchema, relName: string): Pa
   const otherRelName = rel.sides[relName].otherName;
   const sqlData = rel.storeData.sql;
 
-  const insertArray = [
-    sqlData.joinFields[otherRelName],
-    sqlData.joinFields[relName],
-  ];
-  const insertString = `insert into "${sqlData.tableName}" (${insertArray.join(', ')})
-    values (${insertArray.map(() => '?').join(', ')})
-    on conflict ("${sqlData.joinFields[otherRelName]}", "${sqlData.joinFields[relName]}") `;
   if (rel.extras) {
     const extraArray = Object.keys(rel.extras).concat();
+    const insertArray = [
+      sqlData.joinFields[otherRelName],
+      sqlData.joinFields[relName],
+    ].concat(extraArray);
+    const insertString = `insert into "${sqlData.tableName}" (${insertArray.join(', ')})
+      values (${insertArray.map(() => '?').join(', ')})
+      on conflict ("${sqlData.joinFields[otherRelName]}", "${sqlData.joinFields[relName]}") `;
     return {
       queryString: `${insertString} do update set ${extraArray.map(v => `${v} = ?`).join(', ')};`,
-      fields: ['item.id', 'child.id'].concat(extraArray).concat(extraArray),
+      fields: ['child.id', 'item.id'].concat(extraArray).concat(extraArray),
     };
   } else {
+    const insertArray = [
+      sqlData.joinFields[otherRelName],
+      sqlData.joinFields[relName],
+    ];
+    const insertString = `insert into "${sqlData.tableName}" (${insertArray.join(', ')})
+      values (${insertArray.map(() => '?').join(', ')})
+      on conflict ("${sqlData.joinFields[otherRelName]}", "${sqlData.joinFields[relName]}") `;
     return {
       queryString: `${insertString} do nothing;`,
-      fields: ['item.id', 'child.id'],
+      fields: ['child.id', 'item.id'],
     };
   }
 }

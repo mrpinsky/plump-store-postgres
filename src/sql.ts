@@ -104,19 +104,26 @@ export class PGStore extends Storage {
   writeAttributes(value: IndefiniteModelData): Bluebird<ModelData> {
     const updateObject = this.validateInput(value);
     const typeInfo = this.getSchema(value.typeName);
-    if ((updateObject.id === undefined) && (this.terminal)) {
-      return this.knex(typeInfo.storeData.sql.tableName).insert(updateObject.attributes).returning(typeInfo.idAttribute)
-      .then((createdId) => {
-        return this.readAttributes({ typeName: value.typeName, id: createdId });
-      });
-    } else if (updateObject.id !== undefined) {
-      return this.knex(updateObject.typeName).where({ [typeInfo.idAttribute]: updateObject.id }).update(updateObject.attributes)
-      .then(() => {
-        return this.readAttributes({ typeName: value.typeName, id: updateObject.id });
-      });
-    } else {
-      throw new Error('Cannot create new content in a non-terminal store');
-    }
+    return Bluebird.resolve()
+    .then(() => {
+      if ((updateObject.id === undefined) && (this.terminal)) {
+        return this.knex(typeInfo.storeData.sql.tableName).insert(updateObject.attributes).returning(typeInfo.idAttribute)
+        .then((createdId) => {
+          return this.readAttributes({ typeName: value.typeName, id: createdId });
+        });
+      } else if (updateObject.id !== undefined) {
+        return this.knex(updateObject.typeName).where({ [typeInfo.idAttribute]: updateObject.id }).update(updateObject.attributes)
+        .then(() => {
+          return this.readAttributes({ typeName: value.typeName, id: updateObject.id });
+        });
+      } else {
+        throw new Error('Cannot create new content in a non-terminal store');
+      }
+    })
+    .then((result) => {
+      this.fireWriteUpdate(Object.assign({}, result, { invalidate: ['attributes'] }));
+      return result;
+    });
   }
 
   readAttributes(value: ModelReference): Bluebird<ModelData> {
@@ -180,11 +187,16 @@ export class PGStore extends Storage {
   delete(value: ModelReference) {
     const schema = this.getSchema(value.typeName);
     return this.knex(schema.storeData.sql.tableName).where({ [schema.idAttribute]: value.id }).delete()
-    .then((o) => o);
+    .then((o) => {
+      this.fireWriteUpdate({ id: value.id, typeName: value.typeName, invalidate: ['attributes', 'relationships'] });
+      return o;
+    });
   }
 
   writeRelationshipItem(value: ModelReference, relName: string, child: RelationshipItem) {
     const subQuery = this.queryCache[value.typeName].relationships[relName];
+    const schema = this.getSchema(value.typeName);
+    const childData = schema.relationships[relName].type.sides[relName];
     return this.knex.raw(
       subQuery.queryString,
       subQuery.fields.map((f) => {
@@ -196,7 +208,15 @@ export class PGStore extends Storage {
           return child.meta[f];
         }
       })
-    );
+    )
+    .then(() => {
+      this.fireWriteUpdate(Object.assign({}, value, { invalidate: [`relationships.${relName}`] }));
+      this.fireWriteUpdate({
+        id: child.id,
+        typeName: childData.otherType,
+        invalidate: [`relationships.${childData.otherName}`],
+      });
+    });
   }
 
   deleteRelationshipItem(value: ModelReference, relName: string, child: RelationshipItem) {
@@ -204,12 +224,21 @@ export class PGStore extends Storage {
     const rel = schema.relationships[relName].type;
     const otherRelName = rel.sides[relName].otherName;
     const sqlData = rel.storeData.sql;
+    const childData = schema.relationships[relName].type.sides[relName];
     return this.knex(sqlData.tableName)
     .where({
       [sqlData.joinFields[otherRelName]]: child.id,
       [sqlData.joinFields[relName]]: value.id,
     })
-    .delete();
+    .delete()
+    .then(() => {
+      this.fireWriteUpdate(Object.assign({}, value, { invalidate: [`relationships.${relName}`] }));
+      this.fireWriteUpdate({
+        id: child.id,
+        typeName: childData.otherType,
+        invalidate: [`relationships.${childData.otherName}`],
+      });
+    });
   }
 
   query(q) {
