@@ -19,7 +19,8 @@ export declare class PGStore extends Storage {
     }): Bluebird<void>;
     writeAttributes(value: IndefiniteModelData): Bluebird<ModelData>;
     readAttributes(value: ModelReference): Bluebird<ModelData>;
-    readRelationship(value: ModelReference, relName: string): Bluebird<ModelData>;
+    bulkRead(item: ModelReference): any;
+    readRelationship(value: ModelReference, relRefName: string): Bluebird<ModelData>;
     delete(value: ModelReference): any;
     writeRelationshipItem(value: ModelReference, relName: string, child: RelationshipItem): any;
     deleteRelationshipItem(value: ModelReference, relName: string, child: RelationshipItem): any;
