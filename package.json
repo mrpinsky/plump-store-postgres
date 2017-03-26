@@ -35,6 +35,7 @@
     "del": "^2.2.2",
     "gulp": "gulpjs/gulp.git#4.0",
     "gulp-sourcemaps": "^1.6.0",
+    "gulp-typescript": "^3.1.6",
     "mocha": "^3.0.2",
     "ts-node": "^3.0.2",
     "tslint": "^4.5.1",
