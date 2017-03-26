@@ -1,7 +1,7 @@
 import * as Bluebird from 'bluebird';
 import * as knex from 'knex';
 import { Storage, IndefiniteModelData, ModelData, ModelSchema, ModelReference, RelationshipItem } from 'plump';
-import { readQuery } from './queryString';
+import { readQuery, bulkQuery } from './queryString';
 import { ParameterizedQuery } from './semiQuery';
 import { writeRelationshipQuery } from './writeRelationshipQuery';
 
@@ -27,6 +27,7 @@ export class PGStore extends Storage {
   private queryCache: {
     [typeName: string]: {
       attributes: ParameterizedQuery,
+      bulkRead: ParameterizedQuery,
       relationships: {
         [relName: string]: ParameterizedQuery,
       }
@@ -92,6 +93,7 @@ export class PGStore extends Storage {
     .then(() => {
       this.queryCache[t.typeName] = {
         attributes: readQuery(t.schema),
+        bulkRead: bulkQuery(t.schema),
         relationships: {}
       };
       Object.keys(t.schema.relationships).forEach(relName => {
@@ -137,29 +139,28 @@ export class PGStore extends Storage {
     });
   }
 
-  // bulkRead(typeName, id) {
-  //   const t = this.getType(typeName);
-  //   let query = t.cacheGet(this, 'bulkRead');
-  //   if (query === undefined) {
-  //     query = bulkQuery(t);
-  //     t.cacheSet(this, 'bulkRead', query);
-  //   }
-  //   return this.knex.raw(query, id)
-  //   .then((o) => {
-  //     if (o.rows[0]) {
-  //       const arrangedArray = o.rows.map((row) => rearrangeData(t, row));
-  //       const rootItem = arrangedArray.filter((it) => it.id === id)[0];
-  //       return {
-  //         data: rootItem,
-  //         included: arrangedArray.filter((it) => it.id !== id),
-  //       };
-  //     } else {
-  //       return null;
-  //     }
-  //   });
-  // }
+  bulkRead(item: ModelReference) {
+    const schema = this.getSchema(item.typeName);
+    const query = this.queryCache[item.typeName].bulkRead;
+    return this.knex.raw(query.queryString, item.id)
+    .then((o) => {
+      if (o.rows[0]) {
+        const arrangedArray = o.rows.map((row) => rearrangeData(schema, row));
+        const rootItem = arrangedArray.filter((it) => it.id === item.id)[0];
+        return {
+          data: rootItem,
+          included: arrangedArray.filter((it) => it.id !== item.id),
+        };
+      } else {
+        return null;
+      }
+    });
+  }
 
-  readRelationship(value: ModelReference, relName: string): Bluebird<ModelData> {
+  readRelationship(value: ModelReference, relRefName: string): Bluebird<ModelData> {
+    const relName = relRefName.indexOf('relationships.') === 0
+      ? relRefName.split('.')[1]
+      : relRefName;
     const schema = this.getSchema(value.typeName);
     const rel = schema.relationships[relName].type;
     const otherRelName = rel.sides[relName].otherName;
@@ -170,8 +171,13 @@ export class PGStore extends Storage {
       selectExtras = `, jsonb_build_object(${Object.keys(rel.extras).map((extra) => `'${extra}', "${sqlData.tableName}"."${extra}"`).join(', ')}) as meta`; // tslint:disable-line max-line-length
     }
 
+    const where = sqlData.where === undefined
+      ? { [sqlData.joinFields[relName]]: value.id }
+      : this.knex.raw(sqlData.where[relName], value.id);
+
     return this.knex(sqlData.tableName)
-    .where(sqlData.joinFields[relName], value.id)
+    .as(relName)
+    .where(where)
     .select(this.knex.raw(`${selectBase}${selectExtras}`))
     .then((l) => {
       return {
