@@ -1,6 +1,6 @@
 {
   "name": "plump-store-postgres",
-  "version": "0.8.0",
+  "version": "0.10.0",
   "description": "Postgres adapter for Plump",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
