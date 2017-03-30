@@ -3,7 +3,6 @@
 
 import * as pg from 'pg';
 import * as chai from 'chai';
-import * as Bluebird from 'bluebird';
 import * as chaiAsPromised from 'chai-as-promised';
 import * as mergeOptions from 'merge-options';
 import 'mocha';
@@ -198,7 +197,7 @@ describe('postgres-specific behaviors', () => {
   });
 
   it('returns many objects in a bulk Query', () => {
-    return Bluebird.all([
+    return Promise.all([
       store.writeAttributes(sampleObject),
       store.writeAttributes(sampleObject),
       store.writeAttributes(sampleObject),
@@ -207,8 +206,8 @@ describe('postgres-specific behaviors', () => {
     ])
     .then((created) => {
       const createdObject = created[0];
-      return Bluebird.all(created.map((obj) => {
-        return Bluebird.all([
+      return Promise.all(created.map((obj) => {
+        return Promise.all([
           store.writeRelationshipItem(obj, 'children', { id: (obj.id as number) * 100 + 1 }),
           store.writeRelationshipItem(obj, 'children', { id: (obj.id as number) * 100 + 2 }),
           store.writeRelationshipItem(obj, 'children', { id: (obj.id as number) * 100 + 3 }),

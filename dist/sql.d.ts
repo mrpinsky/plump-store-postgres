@@ -1,28 +1,22 @@
-/// <reference types="bluebird" />
-import * as Bluebird from 'bluebird';
-import { Storage, IndefiniteModelData, ModelData, ModelSchema, ModelReference, RelationshipItem } from 'plump';
-export declare class PGStore extends Storage {
+import { Storage, IndefiniteModelData, ModelData, ModelSchema, ModelReference, RelationshipItem, TerminalStore } from 'plump';
+export declare class PGStore extends Storage implements TerminalStore {
     private knex;
     private queryCache;
     constructor(opts?: {
         [opt: string]: any;
     });
     teardown(): any;
-    cache(value: ModelData): Bluebird<ModelData>;
-    cacheAttributes(value: ModelData): Bluebird<ModelData>;
-    cacheRelationship(value: ModelData): Bluebird<ModelData>;
-    wipe(value: ModelReference, key?: string | string[]): void;
-    allocateId(typeName: string): Bluebird<number>;
+    allocateId(typeName: string): Promise<number>;
     addSchema(t: {
         typeName: string;
         schema: ModelSchema;
-    }): Bluebird<void>;
-    writeAttributes(value: IndefiniteModelData): Bluebird<ModelData>;
-    readAttributes(value: ModelReference): Bluebird<ModelData>;
+    }): Promise<void>;
+    writeAttributes(value: IndefiniteModelData): Promise<ModelData>;
+    readAttributes(value: ModelReference): Promise<ModelData>;
     bulkRead(item: ModelReference): any;
-    readRelationship(value: ModelReference, relRefName: string): Bluebird<ModelData>;
+    readRelationship(value: ModelReference, relRefName: string): Promise<ModelData>;
     delete(value: ModelReference): any;
     writeRelationshipItem(value: ModelReference, relName: string, child: RelationshipItem): any;
     deleteRelationshipItem(value: ModelReference, relName: string, child: RelationshipItem): any;
-    query(q: any): Bluebird<any>;
+    query(q: any): Promise<any>;
 }

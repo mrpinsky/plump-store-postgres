@@ -1,6 +1,5 @@
-import * as Bluebird from 'bluebird';
 import * as knex from 'knex';
-import { Storage, IndefiniteModelData, ModelData, ModelSchema, ModelReference, RelationshipItem } from 'plump';
+import { Storage, IndefiniteModelData, ModelData, ModelSchema, ModelReference, RelationshipItem, TerminalStore } from 'plump';
 import { readQuery, bulkQuery } from './queryString';
 import { ParameterizedQuery } from './semiQuery';
 import { writeRelationshipQuery } from './writeRelationshipQuery';
@@ -21,7 +20,7 @@ function rearrangeData(type: ModelSchema, data: any): ModelData {
   return retVal;
 }
 
-export class PGStore extends Storage {
+export class PGStore extends Storage implements TerminalStore {
 
   private knex;
   private queryCache: {
@@ -61,29 +60,14 @@ export class PGStore extends Storage {
   /*
     note that knex.js "then" functions aren't actually promises the way you think they are.
     you can return knex.insert().into(), which has a then() on it, but that thenable isn't
-    an actual promise yet. So instead we're returning Bluebird.resolve(thenable);
+    an actual promise yet. So instead we're returning Promise.resolve(thenable);
   */
 
   teardown() {
     return this.knex.destroy();
   }
 
-  cache(value: ModelData): Bluebird<ModelData> {
-    throw new Error('SQLSTORE is not a cache');
-  }
-  cacheAttributes(value: ModelData): Bluebird<ModelData> {
-    throw new Error('SQLSTORE is not a cache');
-  }
-  cacheRelationship(value: ModelData): Bluebird<ModelData> {
-    throw new Error('SQLSTORE is not a cache');
-  }
-  wipe(value: ModelReference, key?: string | string[]): void {
-    throw new Error('SQLSTORE is not a cache');
-  }
-
-
-
-  allocateId(typeName: string): Bluebird<number> {
+  allocateId(typeName: string): Promise<number> {
     return this.knex.raw('select nextval(?::regclass);', `${typeName}_id_seq`)
     .then((data) => data.rows[0].nextval);
   }
@@ -103,10 +87,10 @@ export class PGStore extends Storage {
   }
 
 
-  writeAttributes(value: IndefiniteModelData): Bluebird<ModelData> {
+  writeAttributes(value: IndefiniteModelData): Promise<ModelData> {
     const updateObject = this.validateInput(value);
     const typeInfo = this.getSchema(value.typeName);
-    return Bluebird.resolve()
+    return Promise.resolve()
     .then(() => {
       if ((updateObject.id === undefined) && (this.terminal)) {
         return this.knex(typeInfo.storeData.sql.tableName).insert(updateObject.attributes).returning(typeInfo.idAttribute)
@@ -128,7 +112,7 @@ export class PGStore extends Storage {
     });
   }
 
-  readAttributes(value: ModelReference): Bluebird<ModelData> {
+  readAttributes(value: ModelReference): Promise<ModelData> {
     return this.knex.raw(this.queryCache[value.typeName].attributes.queryString, value.id)
     .then((o) => {
       if (o.rows[0]) {
@@ -157,7 +141,7 @@ export class PGStore extends Storage {
     });
   }
 
-  readRelationship(value: ModelReference, relRefName: string): Bluebird<ModelData> {
+  readRelationship(value: ModelReference, relRefName: string): Promise<ModelData> {
     const relName = relRefName.indexOf('relationships.') === 0
       ? relRefName.split('.')[1]
       : relRefName;
@@ -248,7 +232,7 @@ export class PGStore extends Storage {
   }
 
   query(q) {
-    return Bluebird.resolve(this.knex.raw(q.query))
+    return Promise.resolve(this.knex.raw(q.query))
     .then((d) => d.rows);
   }
 }
