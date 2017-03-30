@@ -1,11 +1,11 @@
 {
   "name": "plump-store-postgres",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Postgres adapter for Plump",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "mocha --compilers js:babel-core/register test/*.spec.js --require test/helper.js"
+    "test": "mocha  --require ts-node/register test/*.spec.ts"
   },
   "repository": {
     "type": "git",
@@ -24,7 +24,6 @@
   },
   "homepage": "https://github.com/kstf/plump-store-postgres#readme",
   "devDependencies": {
-    "@types/bluebird": "^3.0.37",
     "@types/chai": "^3.4.35",
     "@types/chai-as-promised": "0.0.30",
     "@types/core-js": "^0.9.38",
@@ -46,7 +45,6 @@
     "plump": "kstf/plump#master"
   },
   "dependencies": {
-    "bluebird": "^3.4.6",
     "knex": "^0.12.1",
     "merge-options": "0.0.64",
     "pg": "^6.1.0",
