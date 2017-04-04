@@ -5,7 +5,6 @@ import * as pg from 'pg';
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
 import * as mergeOptions from 'merge-options';
-import 'mocha';
 
 import { PGStore } from '../src/index';
 import { TestType } from './testType';
