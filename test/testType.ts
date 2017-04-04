@@ -94,5 +94,5 @@ export const TestSchema: ModelSchema = {
 
 export class TestType extends Model {
   static typeName = 'tests';
-  static schema = TestSchema;
+  static schema: ModelSchema = TestSchema;
 }

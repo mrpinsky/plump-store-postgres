@@ -1,11 +1,11 @@
 {
   "name": "plump-store-postgres",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Postgres adapter for Plump",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "mocha --compilers js:babel-core/register test/*.spec.js --require test/helper.js"
+    "test": "mocha  --require ts-node/register test/*.spec.ts"
   },
   "repository": {
     "type": "git",
@@ -24,33 +24,31 @@
   },
   "homepage": "https://github.com/kstf/plump-store-postgres#readme",
   "devDependencies": {
-    "@types/bluebird": "^3.0.37",
     "@types/chai": "^3.4.35",
     "@types/chai-as-promised": "0.0.30",
-    "@types/core-js": "^0.9.38",
+    "@types/core-js": "^0.9.41",
     "@types/mocha": "^2.2.40",
-    "@types/node": "^7.0.10",
+    "@types/node": "^7.0.12",
     "chai": "^3.5.0",
-    "chai-as-promised": "^5.3.0",
+    "chai-as-promised": "^6.0.0",
     "del": "^2.2.2",
     "gulp": "gulpjs/gulp.git#4.0",
-    "gulp-sourcemaps": "^1.6.0",
+    "gulp-sourcemaps": "^2.5.1",
     "gulp-typescript": "^3.1.6",
-    "mocha": "^3.0.2",
+    "mocha": "^3.2.0",
     "ts-node": "^3.0.2",
-    "tslint": "^4.5.1",
+    "tslint": "^5.0.0",
     "tslint-eslint-rules": "^3.5.1",
-    "typescript": "^2.2.1"
+    "typescript": "^2.2.2"
   },
   "peerDependencies": {
     "plump": "kstf/plump#master"
   },
   "dependencies": {
-    "bluebird": "^3.4.6",
-    "knex": "^0.12.1",
+    "knex": "^0.12.9",
     "merge-options": "0.0.64",
-    "pg": "^6.1.0",
+    "pg": "^6.1.5",
     "pg-native": "^1.10.0",
-    "rxjs": "^5.2.0"
+    "rxjs": "^5.3.0"
   }
 }
