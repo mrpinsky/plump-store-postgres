@@ -5,10 +5,9 @@ const ts = require('gulp-typescript');
 
 function build() {
   const tsProject = ts.createProject('tsconfig.json');
-  return tsProject.src()
+  return gulp.src(config.scripts, { cwd: config.src })
   .pipe(sourcemaps.init())
   .pipe(tsProject())
-  .js
   .pipe(sourcemaps.write())
   .pipe(gulp.dest(config.dest));
 }
